@@ -1,6 +1,9 @@
 # RawSocketStreaming
 Criação de um protocolo de comunicação entre duas máquinas visando implementar um sistema de Streaming que opere no modo Cliente-Servidor.
 
+## Informações úteis
+- A interface **loopback** no Linux é conhecida como lo com o endereço de IP 127.0.0.1. Quando você manda algo pra esse endereço, ele manda de volta pra você
+
  Um cliente executa normalmente os seguintes passos para estabelecer uma comunicação com um servidor:
 
     Cria um socket, usando a chamada de sistema socket
