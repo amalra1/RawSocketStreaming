@@ -31,13 +31,6 @@ int main(int argc, char *argv[]) {
 
     addr_len = sizeof(struct sockaddr_ll);
 
-    // Receive message from server
-    if (recvfrom(sockfd, buffer, BUFFER_LENGTH, 0, (struct sockaddr*)&server_addr, &addr_len) < 0) {
-        perror("Receive error:");
-        return EXIT_FAILURE;
-    }
-    fprintf(stdout, "Server says: %s\n", buffer);
-
     while (1) {
         // Zeroing the buffer
         memset(buffer, 0x0, BUFFER_LENGTH);
