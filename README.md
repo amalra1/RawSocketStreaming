@@ -21,3 +21,11 @@ Um servidor normalmente executa os seguintes passos para oferecer serviço a seu
     Encerra a comunicação com aquele cliente, fecha o descritor da conexão (chamada close).
     Volta ao passo 4, ou encerra suas atividades fechando seu socket (chamada close).
 
+## Atualizações
+* Por primeiro, focamos em criar o arquivo 'server.c' e fazer a criação do Raw Socket funcionar.
+* Em seguida, criamos o 'client.c' e o objetivo agora foi estabelecer a comunicação entre servidor e cliente, foi feito, porém alguns problemas notados.
+- [ ] Server copia e responde as mensagens enviadas pelo Client no primeiro momento da conexão.
+- [ ] Server só aceita mensagens que tenham mais de ~18 caracteres, senão não envia e da erro no client.
+- [ ] Às vezes Client não se conecta com o Server, precisando reiniciar esse para que a conexão funcione.
+
+  
