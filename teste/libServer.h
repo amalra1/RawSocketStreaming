@@ -15,6 +15,6 @@ typedef struct
 } frame_t;
 
 // Meio de comunicar entre cliente e servidor
-int cria_raw_socket(char *nome_interface_rede);
+int cria_raw_socket(char* nome_interface_rede, struct sockaddr_ll *endereco); 
 
 #endif

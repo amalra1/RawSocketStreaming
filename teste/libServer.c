@@ -1,15 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <arpa/inet.h>
-#include <net/ethernet.h> 
-#include <linux/if_packet.h> 
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netpacket/packet.h>
+#include <net/ethernet.h>
 #include <net/if.h>
-#include "libServer.h" 
+#include <arpa/inet.h>
 
-// Meio de comunicar entre cliente e servidor
-int cria_raw_socket(char* nome_interface_rede) 
+int cria_raw_socket(char* nome_interface_rede, struct sockaddr_ll *endereco) 
 { 
-    // Cria arquivo para o socket sem qualquer protocolo 
+    // Create raw socket
     int soquete = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
     if (soquete == -1) 
@@ -18,18 +20,22 @@ int cria_raw_socket(char* nome_interface_rede)
         exit(-1); 
     }
 
-    printf("Soquete criado");
+    printf("Soquete criado\n");
 
     int ifindex = if_nametoindex(nome_interface_rede);
+    if (ifindex == 0) {
+        perror("Ifindex error:");
+        exit(-1);
+    }
 
-    struct sockaddr_ll endereco = {0};
-    endereco.sll_family = AF_PACKET;
-    endereco.sll_protocol = htons(ETH_P_ALL);
-    endereco.sll_ifindex = ifindex;
+    memset(endereco, 0, sizeof(struct sockaddr_ll));
+    endereco->sll_family = AF_PACKET;
+    endereco->sll_protocol = htons(ETH_P_ALL);
+    endereco->sll_ifindex = ifindex;
 
-    // Inicializa socket
-    if (bind(soquete, (struct sockaddr*) &endereco, sizeof(endereco)) == -1) {
-        fprintf(stderr, "Erro ao fazer bind no socket\n");
+    // Bind the socket to the network interface
+    if (bind(soquete, (struct sockaddr*) endereco, sizeof(struct sockaddr_ll)) == -1) {
+        perror("Erro ao fazer bind no socket");
         exit(-1);
     }
 
@@ -37,7 +43,7 @@ int cria_raw_socket(char* nome_interface_rede)
     mr.mr_ifindex = ifindex;
     mr.mr_type = PACKET_MR_PROMISC;
 
-    // Não joga fora o que identifica como lixo: Modo promíscuo
+    // Set socket to promiscuous mode
     if (setsockopt(soquete, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mr, sizeof(mr)) == -1) {
         fprintf(stderr, "Erro ao fazer setsockopt: "
             "Verifique se a interface de rede foi especificada corretamente.\n");
