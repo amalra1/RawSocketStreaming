@@ -1,13 +1,18 @@
-nome=server
+server_name=server
+client_name=client
 
-objs=libServer.o server.o
+server_objs=libServer.o server.o
+client_objs=libServer.o client.o
 
 CFLAGS := -Wall -lncurses
 
-all: $(nome)
+all: $(server_name) $(client_name)
 
-$(nome): $(objs)
-	gcc -o $(nome) $(objs) $(CFLAGS)
+$(server_name): $(server_objs)
+	gcc -o $(server_name) $(server_objs) $(CFLAGS)
+
+$(client_name): $(client_objs)
+	gcc -o $(client_name) $(client_objs) $(CFLAGS)
 
 libServer.o: libServer.h libServer.c
 	gcc -c libServer.c $(CFLAGS)
@@ -15,8 +20,11 @@ libServer.o: libServer.h libServer.c
 server.o: server.c
 	gcc -c server.c $(CFLAGS)
 
+client.o: client.c
+	gcc -c client.c $(CFLAGS)
+
 clean:
-	rm -f $(objs) *~
+	rm -f $(server_objs) $(client_objs) *~
 
 purge: clean
-	-rm -f $(nome)
+	-rm -f $(server_name) $(client_name)
