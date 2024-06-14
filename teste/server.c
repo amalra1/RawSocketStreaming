@@ -13,57 +13,70 @@
 
 #define BUFFER_LENGTH 4096
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) 
+{
     struct sockaddr_ll client_addr;
+    socklen_t addr_len = sizeof(struct sockaddr_ll);
     int sockfd;
-    socklen_t addr_len;
     char buffer[BUFFER_LENGTH];
+    int recvfromRET;
 
-    fprintf(stdout, "Starting server\n");
+    fprintf(stdout, "Iniciando Server ....\n");
 
-    // Create raw socket
+    // Cria o Raw Socket
     sockfd = cria_raw_socket("lo", &client_addr);
-    if (sockfd == -1) {
+    if (sockfd == -1) 
+    {
         perror("Error on server socket creation:");
         return EXIT_FAILURE;
     }
     fprintf(stdout, "Server socket created with fd: %d\n", sockfd);
 
-    addr_len = sizeof(struct sockaddr_ll);
-
-    // Send a welcome message to the client
-    strcpy(buffer, "Hello, client!\n");
-    if (sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&client_addr, addr_len) < 0) {
-        perror("Send error:");
-        return EXIT_FAILURE;
-    }
-
-    // Loop to receive messages from the client
-    while (1) {
-        // Zeroing the buffer
+    // LOOP PRINCIPAL DO SERVER
+    while (1) 
+    {
+        // Zera o buffer
         memset(buffer, 0x0, BUFFER_LENGTH);
 
-        // Receive message from client
-        if (recvfrom(sockfd, buffer, BUFFER_LENGTH, 0, (struct sockaddr*)&client_addr, &addr_len) < 0) {
+        recvfromRET = recvfrom(sockfd, buffer, BUFFER_LENGTH - 1, 0, (struct sockaddr*)&client_addr, &addr_len);
+
+        // Recebe mensagens do Client
+        if (recvfromRET < 0) 
+        {
             perror("Receive error:");
             return EXIT_FAILURE;
         }
-        printf("Client says: %s\n", buffer);
+        else if (recvfromRET > 0)
+        { 
+            // Ensure the buffer is null-terminated
+            buffer[recvfromRET] = '\0'; // Add null terminator at the end of received data
 
-        // 'bye' message finishes the connection
-        if (strncmp(buffer, "bye", 3) == 0) {
-            sendto(sockfd, "bye", 3, 0, (struct sockaddr*)&client_addr, addr_len);
-            break;
-        } else {
-            // Send response to client
-            sendto(sockfd, "yep\n", 4, 0, (struct sockaddr*)&client_addr, addr_len);
+            printf("RECVFROMRET: %d\n", recvfromRET);
+            printf("Client disse: %s\n", buffer);
+
+            // Da mesma forma que o Client, 'bye' fecha a conexão
+            if (strncmp(buffer, "bye", 3) == 0) 
+            {
+                sendto(sockfd, "bye", 3, 0, (struct sockaddr*)&client_addr, addr_len);
+                break;
+            } 
+            else if (strncmp(buffer, "BBBBBBBBBBBBBBBBBBBBBBBBBBB", 27) == 0)
+                // Manda resposta para o Client
+                sendto(sockfd, "yepBBBBBBBBBBBBBBBBBBBBBBBBBBBB", 31, 0, (struct sockaddr*)&client_addr, addr_len);
+
+            // // // Optional: Periodically send a message to the client
+            // strcpy(buffer, "Periodic message from server test aaaaaaaaaa");
+            // if (sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&client_addr, addr_len) < 0) 
+            // {
+            //     perror("Send error:");
+            // }
         }
     }
 
-    // Close the socket
+    // Close socket
     close(sockfd);
 
-    printf("Connection closed\n\n");
+    printf("Conexão fechada\n\n");
 
     return EXIT_SUCCESS;
 }

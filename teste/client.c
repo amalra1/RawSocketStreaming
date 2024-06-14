@@ -13,52 +13,57 @@
 
 #define BUFFER_LENGTH 4096
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) 
+{
     struct sockaddr_ll server_addr;
+    socklen_t addr_len = sizeof(struct sockaddr_ll);
     int sockfd;
-    socklen_t addr_len;
     char buffer[BUFFER_LENGTH];
 
-    fprintf(stdout, "Starting Client ...\n");
+    fprintf(stdout, "Iniciando Client ...\n");
 
-    // Create raw socket
+    // Criação do Raw Socket para comunicação
     sockfd = cria_raw_socket("lo", &server_addr);
-    if (sockfd == -1) {
+    if (sockfd == -1) 
+    {
         perror("Error on client socket creation:");
         return EXIT_FAILURE;
     }
-    fprintf(stdout, "Client socket created with fd: %d\n", sockfd);
+    fprintf(stdout, "Socket do Client criado com descritor: %d\n", sockfd);
 
-    addr_len = sizeof(struct sockaddr_ll);
-
-    while (1) {
-        // Zeroing the buffer
+    // LOOP PRINCIPAL DO CLIENT
+    while (1) 
+    {
+        // Zera o buffer que será usado para mensagem
         memset(buffer, 0x0, BUFFER_LENGTH);
 
-        fprintf(stdout, "Say something to the server: ");
+        // Captura da mensagem a ser enviada
+        fprintf(stdout, "Diga algo para o Server: ");
         fgets(buffer, BUFFER_LENGTH, stdin);
 
-        // Send message to server
-        if (sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&server_addr, addr_len) < 0) {
+        // Manda a mensagem pro Server
+        if (sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&server_addr, addr_len) < 0) 
+        {
             perror("Send error:");
             return EXIT_FAILURE;
         }
 
-        // Receive response from server
-        if (recvfrom(sockfd, buffer, BUFFER_LENGTH, 0, (struct sockaddr*)&server_addr, &addr_len) < 0) {
+        // Recebe resposta do Server
+        if (recvfrom(sockfd, buffer, BUFFER_LENGTH, 0, (struct sockaddr*)&server_addr, &addr_len) < 0) 
+        {
             perror("Receive error:");
             return EXIT_FAILURE;
         }
         fprintf(stdout, "Server answer: %s\n", buffer);
 
-        // 'bye' message finishes the connection
+        // Se digita 'bye' acaba com a conexão
         if (strncmp(buffer, "bye", 3) == 0)
             break;
     }
 
     close(sockfd);
 
-    fprintf(stdout, "\nConnection closed\n\n");
+    fprintf(stdout, "\nConexão fechada\n\n");
 
     return EXIT_SUCCESS;
 }

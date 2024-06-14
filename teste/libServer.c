@@ -11,7 +11,7 @@
 
 int cria_raw_socket(char* nome_interface_rede, struct sockaddr_ll *endereco) 
 { 
-    // Create raw socket
+    // Cria o Raw Socket
     int soquete = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
     if (soquete == -1) 
@@ -34,7 +34,8 @@ int cria_raw_socket(char* nome_interface_rede, struct sockaddr_ll *endereco)
     endereco->sll_ifindex = ifindex;
 
     // Bind the socket to the network interface
-    if (bind(soquete, (struct sockaddr*) endereco, sizeof(struct sockaddr_ll)) == -1) {
+    if (bind(soquete, (struct sockaddr*) endereco, sizeof(struct sockaddr_ll)) == -1) 
+    {
         perror("Erro ao fazer bind no socket");
         exit(-1);
     }
@@ -43,8 +44,9 @@ int cria_raw_socket(char* nome_interface_rede, struct sockaddr_ll *endereco)
     mr.mr_ifindex = ifindex;
     mr.mr_type = PACKET_MR_PROMISC;
 
-    // Set socket to promiscuous mode
-    if (setsockopt(soquete, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mr, sizeof(mr)) == -1) {
+    // Coloca o socket no modo promíscuo
+    if (setsockopt(soquete, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mr, sizeof(mr)) == -1) 
+    {
         fprintf(stderr, "Erro ao fazer setsockopt: "
             "Verifique se a interface de rede foi especificada corretamente.\n");
         exit(-1);
