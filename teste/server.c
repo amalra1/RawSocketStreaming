@@ -35,6 +35,8 @@ int main(int argc, char *argv[])
     // LOOP PRINCIPAL DO SERVER
     while (1) 
     {
+        // TUDO ABAIXO DESSE COMENTÁRIO É CÓDIGO ANTIGO, não mexi no Server ainda
+
         // Zera o buffer
         memset(buffer, 0x0, BUFFER_LENGTH);
 
@@ -63,13 +65,6 @@ int main(int argc, char *argv[])
             else if (strncmp(buffer, "BBBBBBBBBBBBBBBBBBBBBBBBBBB", 27) == 0)
                 // Manda resposta para o Client
                 sendto(sockfd, "yepBBBBBBBBBBBBBBBBBBBBBBBBBBBB", 31, 0, (struct sockaddr*)&client_addr, addr_len);
-
-            // // // Optional: Periodically send a message to the client
-            // strcpy(buffer, "Periodic message from server test aaaaaaaaaa");
-            // if (sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&client_addr, addr_len) < 0) 
-            // {
-            //     perror("Send error:");
-            // }
         }
     }
 

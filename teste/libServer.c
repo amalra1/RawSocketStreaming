@@ -8,6 +8,7 @@
 #include <net/ethernet.h>
 #include <net/if.h>
 #include <arpa/inet.h>
+#include "libServer.h"
 
 int cria_raw_socket(char* nome_interface_rede, struct sockaddr_ll *endereco) 
 { 
@@ -54,3 +55,71 @@ int cria_raw_socket(char* nome_interface_rede, struct sockaddr_ll *endereco)
 
     return soquete;
 }
+
+void inicializa_frame(frame_t *frame) 
+{
+    memset(frame, 0, sizeof(frame_t));
+    memset(frame->dados, 0, TAM_DADOS);
+}
+
+frame_t monta_mensagem(int inicio, unsigned char tam, unsigned char sequencia, unsigned char tipo, char* dados, unsigned char crc) 
+{
+    frame_t frame;
+    
+    if (inicio)
+        frame.marcadorInicio = 0x7E; // (0111 1110)
+    else
+        frame.marcadorInicio = 0x00; // (0000 0000)
+
+    frame.tamanho = tam;
+
+    frame.sequencia = sequencia;
+
+    frame.tipo = tipo;
+
+    memset(frame.dados, 0, 64);
+    if (dados != NULL) 
+        strncpy(frame.dados, dados, 64 - 1); // Ensure null-terminated string
+
+    frame.crc8 = crc;
+    return frame;
+}
+
+// Função interna para imprimir os bits de cada byte
+void print_bits(unsigned char byte, int num_bits) 
+{
+    for (int i = num_bits - 1; i >= 0; --i)
+        printf("%d", (byte >> i) & 1);
+}
+
+void print_frame(frame_t *frame) 
+{
+    printf("\nMarcador de inicio: ");
+    print_bits(frame->marcadorInicio, 8);
+    printf("\n");
+
+    printf("Tamanho: ");
+    print_bits(frame->tamanho, 6);
+    printf("\n");
+
+    printf("Sequência: ");
+    print_bits(frame->sequencia, 5);
+    printf("\n");
+
+    printf("Tipo: ");
+    print_bits(frame->tipo, 5);
+    printf("\n");
+
+    printf("Dados: ");
+    for (int i = 0; i < TAM_DADOS; ++i) {
+        print_bits(frame->dados[i], 8);
+        printf(" ");
+    }
+    printf("\n");
+
+    printf("Crc-8: ");
+    print_bits(frame->crc8, 8);
+    printf("\n\n");
+}
+
+

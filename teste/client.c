@@ -18,7 +18,8 @@ int main(int argc, char *argv[])
     struct sockaddr_ll server_addr;
     socklen_t addr_len = sizeof(struct sockaddr_ll);
     int sockfd;
-    char buffer[BUFFER_LENGTH];
+    char bufferMensagem[BUFFER_LENGTH];
+    int entrada;
 
     fprintf(stdout, "Iniciando Client ...\n");
 
@@ -29,36 +30,104 @@ int main(int argc, char *argv[])
         perror("Error on client socket creation:");
         return EXIT_FAILURE;
     }
-    fprintf(stdout, "Socket do Client criado com descritor: %d\n", sockfd);
+    //fprintf(stdout, "Socket do Client criado com descritor: %d\n", sockfd);
+    printf("Client iniciado com sucesso, selecione alguma das opções abaixo.\n\n");
+
+    printf("[1]. Listar todos os filmes\n[2]. Baixar algum filme\n[3]. Mostra na tela(?)\n[4]. Descritor arquivo(?)\n[5]. Dados de algum filme\n[6]. Fechar o Client\n");
 
     // LOOP PRINCIPAL DO CLIENT
     while (1) 
     {
+        printf("Escolha uma opção: ");
+        scanf("%d", &entrada);
+
+        // Caso entrada inválida
+        while (entrada < 1 || entrada > 6)
+        {
+            printf("\nEntrada inválida, escolha entre [1] e [6]\n");
+            printf("[1]. Listar todos os filmes\n[2]. Baixar algum filme\n[3]. Mostra na tela(?)\n[4]. Descritor arquivo(?)\n[5]. Dados de algum filme\n[6]. Fechar o Client\n");
+
+            printf("Escolha uma opção: ");
+            scanf("%d", &entrada);
+        }
+
+        printf("Sua opção foi: %d\n", entrada);
+
+        // Aqui cria o frame para envio da mensagem e variáveis para preenchê-lo 
+        // de acordo com a opt escolhida acima
+        frame_t frame;
+
+        inicializa_frame(&frame);
+
+        unsigned char inicio;
+        unsigned char tam;
+        unsigned char seq;
+        unsigned char tipo;
+        char dados[TAM_DADOS];
+        unsigned char crc;
+
+        // Lista todos os filmes
+        if (entrada == 1)
+        {
+            // Para listar, só precisará enviar uma mensagem, o que importa 
+            // mesmo é o campo "tipo" ser entendido pelo Server
+
+            inicio = 1;
+            tam = 0x00;
+            seq = 0x00;  
+            tipo = 0x0A; // 01010
+            memset(dados, 0, TAM_DADOS);
+            crc = 0x00;
+
+            frame = monta_mensagem(inicio, tam, seq, tipo, dados, crc);
+
+            print_frame(&frame);
+
+            // ------------------------ PRÓXIMOS PASSOS
+
+            // Enviar a mensagem 
+                // -- Dividir em pedaços 5 bits por 5 bits? -> Janela Deslizante de tamanho 5 do enunciado
+
+            // A cada pedaço enviado, receber resposta do server
+                // Ack / Nack
+
+            // Depois de ter recebido Ack de todas as partes, aí vem a parte do Server interpretar a msg lá dentro
+                // Na verdade antes de interpretar, vem o server(?) realizar o CRC-8 com a msg completa
+
+            // Depois do CRC-8, server tem que mandar o que foi pedido para o Client
+                // Mesmo processo de montar e mandar msg, mas agora do Server pro Client
+
+            // Depois de recebida, usar o conteúdo da msg para fazer algo na tela
+                // No caso 1, usar os títulos dos filmes que virão nos Dados, para imprimir eles na tela
+        }
+
+        // -------------------PARTE ANTIGA
+
         // Zera o buffer que será usado para mensagem
-        memset(buffer, 0x0, BUFFER_LENGTH);
+        memset(bufferMensagem, 0x0, BUFFER_LENGTH);
 
-        // Captura da mensagem a ser enviada
-        fprintf(stdout, "Diga algo para o Server: ");
-        fgets(buffer, BUFFER_LENGTH, stdin);
+        // // Captura da mensagem a ser enviada
+        // fprintf(stdout, "Diga algo para o Server: ");
+        // fgets(buffer, BUFFER_LENGTH, stdin);
 
-        // Manda a mensagem pro Server
-        if (sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&server_addr, addr_len) < 0) 
-        {
-            perror("Send error:");
-            return EXIT_FAILURE;
-        }
+        // // Manda a mensagem pro Server
+        // if (sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&server_addr, addr_len) < 0) 
+        // {
+        //     perror("Send error:");
+        //     return EXIT_FAILURE;
+        // }
 
-        // Recebe resposta do Server
-        if (recvfrom(sockfd, buffer, BUFFER_LENGTH, 0, (struct sockaddr*)&server_addr, &addr_len) < 0) 
-        {
-            perror("Receive error:");
-            return EXIT_FAILURE;
-        }
-        fprintf(stdout, "Server answer: %s\n", buffer);
+        // // Recebe resposta do Server
+        // if (recvfrom(sockfd, buffer, BUFFER_LENGTH, 0, (struct sockaddr*)&server_addr, &addr_len) < 0) 
+        // {
+        //     perror("Receive error:");
+        //     return EXIT_FAILURE;
+        // }
+        // fprintf(stdout, "Server answer: %s\n", buffer);
 
-        // Se digita 'bye' acaba com a conexão
-        if (strncmp(buffer, "bye", 3) == 0)
-            break;
+        // // Se digita 'bye' acaba com a conexão
+        // if (strncmp(buffer, "bye", 3) == 0)
+        //     break;
     }
 
     close(sockfd);
