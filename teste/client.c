@@ -20,6 +20,7 @@ int main(int argc, char *argv[])
     int sockfd;
     char bufferMensagem[BUFFER_LENGTH];
     int entrada;
+    int tentativas = 0;
 
     fprintf(stdout, "Iniciando Client ...\n");
 
@@ -77,16 +78,85 @@ int main(int argc, char *argv[])
             seq = 0x00;  
             tipo = 0x0A; // 01010
             memset(dados, 0, TAM_DADOS);
+            strncpy(dados, "test", TAM_DADOS);
             crc = 0x00;
 
             frame = monta_mensagem(inicio, tam, seq, tipo, dados, crc);
 
             print_frame(&frame);
 
+            // Zera o buffer que será usado para mensagem
+            memset(bufferMensagem, 0x0, BUFFER_LENGTH); 
+
+            // Copia o frame para o buffer de envio
+            memcpy(bufferMensagem, &frame, sizeof(frame_t));
+
+            // Retry loop for sending the frame
+            while (tentativas < MAX_TENTATIVAS) 
+            {
+                if (sendto(sockfd, bufferMensagem, sizeof(frame_t), 0, (struct sockaddr *)&server_addr, addr_len) < 0) 
+                {
+                    perror("Send error:");
+                    return EXIT_FAILURE;
+                }
+
+                frame_t frame_resp;
+
+                if (recvfrom(sockfd, &frame_resp, sizeof(frame_t), 0, (struct sockaddr *)&server_addr, &addr_len) < 0) 
+                {
+                    perror("Receive ACK error:");
+                    return EXIT_FAILURE;
+                }
+
+                print_frame(&frame_resp);
+
+                // Validação da resposta do Server
+
+                if (calcula_crc(&frame_resp))
+                {
+                    printf("CRC-8 OK, mensagem recebida com sucesso.\n");
+                    break;  // Sai do loop das tentativas
+                }
+                else
+                {
+                    printf("CRC-8 falhou, (tentativa %d/%d).\n", tentativas + 1, MAX_TENTATIVAS);
+                    tentativas++;
+                }
+
+                // unsigned char received_crc = calculate_crc8(&frame_resp);
+
+                // if (received_crc == frame_resp.crc8 && frame_resp.marcadorInicio == 0x7E) 
+                // {
+                //     printf("Valid ACK received.\n");
+                //     break; // Se válido, sai desse loop interno de tentativas
+                // } 
+                // else 
+                // {
+                //     printf("Invalid ACK received (attempt %d/%d).\n", tentativas + 1, MAX_TENTATIVAS);
+                //     tentativas++;
+                // }
+            }
+
+            if (tentativas == MAX_TENTATIVAS) 
+            {
+                printf("Número máximo de tentativas alcançadas. O processo de validação da resposta falhou.\n");
+                break;
+            }
+
+            tentativas = 0;
+
+        if (entrada == 6)
+            break;
+
+        }
+    }
+
             // ------------------------ PRÓXIMOS PASSOS
 
             // Enviar a mensagem 
                 // -- Dividir em pedaços 5 bits por 5 bits? -> Janela Deslizante de tamanho 5 do enunciado
+                // -- Para mensagens que não envolvem transferência de arquivo, é Para-e-espera
+                // Aparentemente é frame | frame | frame e não bit | bit | bit de cada frame
 
             // A cada pedaço enviado, receber resposta do server
                 // Ack / Nack
@@ -99,12 +169,11 @@ int main(int argc, char *argv[])
 
             // Depois de recebida, usar o conteúdo da msg para fazer algo na tela
                 // No caso 1, usar os títulos dos filmes que virão nos Dados, para imprimir eles na tela
-        }
 
         // -------------------PARTE ANTIGA
 
-        // Zera o buffer que será usado para mensagem
-        memset(bufferMensagem, 0x0, BUFFER_LENGTH);
+        // // Zera o buffer que será usado para mensagem
+        // memset(bufferMensagem, 0x0, BUFFER_LENGTH);
 
         // // Captura da mensagem a ser enviada
         // fprintf(stdout, "Diga algo para o Server: ");
@@ -128,7 +197,6 @@ int main(int argc, char *argv[])
         // // Se digita 'bye' acaba com a conexão
         // if (strncmp(buffer, "bye", 3) == 0)
         //     break;
-    }
 
     close(sockfd);
 
