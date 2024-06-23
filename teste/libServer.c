@@ -77,9 +77,9 @@ frame_t monta_mensagem(int inicio, unsigned char tam, unsigned char sequencia, u
 
     frame.tipo = tipo;
 
-    memset(frame.dados, 0, 64);
+    memset(frame.dados, 0, TAM_DADOS);
     if (dados != NULL) 
-        strncpy(frame.dados, dados, 64 - 1); // Ensure null-terminated string
+        strncpy(frame.dados, dados, TAM_DADOS - 1); // Ensure null-terminated string
 
     frame.crc8 = crc;
     return frame;
@@ -121,5 +121,14 @@ void print_frame(frame_t *frame)
     print_bits(frame->crc8, 8);
     printf("\n\n");
 }
+
+int calcula_crc(frame_t *frame)
+{
+
+
+    return 0;
+}
+
+
 
 

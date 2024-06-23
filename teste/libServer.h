@@ -2,6 +2,10 @@
 #define _libServer_
 
 #define TAM_DADOS 64 // 1byte = 8bits, 64bytes = 512bits
+#define TAM_JANELA_PEE 1  // Tamanho da janela do Para-E-Espera
+#define TAM_JANELA_JD 5  // Tamanho da janela da Janela Deslizante
+#define MAX_TENTATIVAS 8  // Número máximo de tentativas após falha do CRC-8
+#define TIMEOUT_SEC 60 
 
 typedef struct
 {
@@ -25,5 +29,8 @@ frame_t monta_mensagem(int inicio, unsigned char tam, unsigned char sequencia, u
 
 // Imprime o frame na tela
 void print_frame(frame_t *frame);
+
+// Calcula o CRC-8 da mensagem, retorna 1 se OK e 0 se não
+int calcula_crc(frame_t *frame);
 
 #endif
