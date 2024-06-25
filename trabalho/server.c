@@ -17,6 +17,7 @@ int main(int argc, char *argv[])
 {
     int sockfd;
     int ack_enviado = 0;
+    int frame_recebido = 0;
 
     frame_t frame;
     frame_t frame_resp;
@@ -43,25 +44,21 @@ int main(int argc, char *argv[])
     {
         if (recvfrom(sockfd, &frame, sizeof(frame), 0, (struct sockaddr *)&sndr_addr, &addr_len))        
         {
-            unsigned char inicio;
-            unsigned char tam;
-            unsigned char seq;
-            unsigned char tipo;
-            char dados[TAM_DADOS];
-            unsigned char crc;
-
-            // Checa pelo marcadorInicio para saber se é uma mensagem válida
-            // (Pra não receber lixos que eventualmente vem para o server)
-            if (frame.marcadorInicio == 0x7E && !ack_enviado) 
+            // Se a mensagem recebida for válida, e não lixo
+            if (frame.marcadorInicio == 0x7E)
             {
-                // Aqui dentro tem que:
-                    // Enviar o ACK ou NACK
-                    // Enviar o que foi pedido
+                unsigned char inicio;
+                unsigned char tam;
+                unsigned char seq;
+                unsigned char tipo;
+                char dados[TAM_DADOS];
+                unsigned char crc;
 
-                printf("Received valid frame:\n");
+                printf("---------FRAME RECEBIDO------------\n");
                 print_frame(&frame);
+                printf("-----------------------------------\n");
 
-                 // Prepara a mensagem de volta (ACK)
+                // Prepara a mensagem de volta (ACK)
                 inicio = 0x7E;
                 tam = 0x00;
                 seq = 0x00;
@@ -71,22 +68,23 @@ int main(int argc, char *argv[])
 
                 frame_resp = monta_mensagem(inicio, tam, seq, tipo, dados, crc);
 
-                printf("\n\n\n");
+                printf("\n---------FRAME QUE SERÁ ENVIADO------------\n");
                 print_frame(&frame_resp);
+                printf("-----------------------------------\n");
 
                 if (sendto(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, addr_len) < 0)
                 {
-                    perror("Send ACK error:");
+                    perror("Erro ao enviar o ACK:");
                     return EXIT_FAILURE;
                 }
-                printf("ACK Sent\n");
+                printf("ACK enviado\n");
 
                 ack_enviado = 1;
-            } 
+            }
         }
         else
         {
-            perror("Receive error:");
+            perror("Erro de recebimento:");
             return EXIT_FAILURE;
         }
     }

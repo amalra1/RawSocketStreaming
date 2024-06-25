@@ -89,7 +89,9 @@ int main(int argc, char *argv[])
 
             frame = monta_mensagem(inicio, tam, seq, tipo, dados, crc);
 
+            printf("\n---------FRAME QUE SERÁ ENVIADO------------\n");
             print_frame(&frame);
+            printf("-----------------------------------\n");
 
             // Envia o frame
             if (sendto(sockfd, &frame, sizeof(frame), 0, (struct sockaddr *)&endereco, sizeof(endereco)) < 0) 
@@ -106,21 +108,23 @@ int main(int argc, char *argv[])
             {
                 if (recvfrom(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, &addr_len) < 0) 
                 {
-                    perror("Receive error:");
+                    perror("Erro de recebimento:");
                     return EXIT_FAILURE;
                 }
 
+                printf("---------FRAME RECEBIDO------------\n");
                 print_frame(&frame_resp);
+                printf("-----------------------------------\n");
 
                 // Check if the received frame is an ACK
                 if (frame_resp.tipo == 0x00 && frame_resp.marcadorInicio == 0x7E)
                 {
-                    printf("ACK received.\n");
+                    printf("ACK recebido.\n");
                     break; // Exit the receiving loop
                 }
                 else
                 {
-                    printf("Received non-ACK message, continue receiving...\n");
+                    printf("Mensagem que não é um ACK recebida, recebendo outra...\n");
                     memset(&frame_resp, 0, sizeof(frame_t));
                 }
             }
