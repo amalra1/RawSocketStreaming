@@ -10,7 +10,7 @@
 #include <arpa/inet.h>
 #include "libServer.h"
 
-int cria_raw_socket(char* nome_interface_rede, struct sockaddr_ll *endereco) 
+int cria_raw_socket(char* nome_interface_rede) 
 { 
     // Cria o Raw Socket
     int soquete = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
@@ -24,18 +24,14 @@ int cria_raw_socket(char* nome_interface_rede, struct sockaddr_ll *endereco)
     printf("Soquete criado\n");
 
     int ifindex = if_nametoindex(nome_interface_rede);
-    if (ifindex == 0) {
-        perror("Ifindex error:");
-        exit(-1);
-    }
+    struct sockaddr_ll endereco = {0};
 
-    memset(endereco, 0, sizeof(struct sockaddr_ll));
-    endereco->sll_family = AF_PACKET;
-    endereco->sll_protocol = htons(ETH_P_ALL);
-    endereco->sll_ifindex = ifindex;
+    endereco.sll_family = AF_PACKET;
+    endereco.sll_protocol = htons(ETH_P_ALL);
+    endereco.sll_ifindex = ifindex;
 
     // Bind the socket to the network interface
-    if (bind(soquete, (struct sockaddr*) endereco, sizeof(struct sockaddr_ll)) == -1) 
+    if (bind(soquete, (struct sockaddr *)&endereco, sizeof(endereco)) == -1)
     {
         perror("Erro ao fazer bind no socket");
         exit(-1);
