@@ -120,7 +120,35 @@ void print_frame(frame_t *frame)
 
 int calcula_crc(frame_t *frame)
 {
+    // Primeiramente importante saber que o CRC é calculado no client.c e adicionado no campo designado
+    // para o mesmo na struct do frame, quando ele chegar ao server.c, o server faz o mesmo processo só que com 
+    // o frame que está com o CRC calculado adicionado no final, provindo do client;
 
+    // Existem vários poliômios usados para o CRC-8, o 0x07 [00000111] é um deles;
+
+    // Para a "Divisão", é acrescentado um 1 na esquerda do polinômio = [{1}00000111];
+
+    // O processo do CRC é feito através de "divisões" sucessivas de polinômios, a "divisão" está entre
+    // aspas porque na verdade é uma sequência de XOR's realizados entre [Dados] e [Polinômio];
+
+    // =========================================================================================================
+    // Seguindo os passos abaixo será possível fazer o CRC, usando como exemplo:
+        // [Dados] = [11111001100]
+        // [Polinômio] = [100000111]
+
+    // 1) Adicionar (N-1) 0's ao final dos [Dados], sendo N o grau do [Polinômio]
+        // [Novos Dados] = [11111001100]{00000000}
+
+    // 2) Começar a sequência de XOR's entre [Novos Dados] e [Polinômio]
+        // 1111100110000000000 | 100000111
+
+    // 3) Enviar o frame para o server
+
+    // 4) Realizar o mesmo cálculo do CRC no server:
+        // Resto == 0 --> Sem erros
+        // Resto != 0 --> Erro
+
+    // 5) 11111001100{Resto da divisão anterior} | 100000111
 
     return 0;
 }
