@@ -101,20 +101,38 @@ int main(int argc, char *argv[])
             printf("ACK recebido.\n");
 
             // Começa a receber os dados referentes ao comando "lista"
-            // Fica recebendo até chegar o do tipo "dados"
-            while (frame_resp.tipo != 0x12)
+            while (frame_resp.tipo != 0x1E) // Até receber um frame do tipo == "fim_tx"
             {
+                // !!!!!!!!!!!! CRC precisa ser calculado nas mensagens que chegam !!!!!!!!!!!!!!!!!
+
                 if (recvfrom(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, &addr_len))
                 {
-                    printf("---------FRAME RECEBIDO DPS DO ACK------------\n");
-                    print_frame(&frame_resp);
-                    printf("-----------------------------------\n");
-                } 
+                    // printf("---------FRAME RECEBIDO DPS DO ACK (LOOP FORA)------------\n");
+                    // print_frame(&frame_resp);
+                    // printf("-----------------------------------\n");
+                }
+
+                if (frame_resp.tipo == 0x1E) // envia ACK aqui?
+                    break; 
+
+                while (frame_resp.tipo != 0x12) // Até receber um frame do tipo == "dados"
+                {
+                    if (recvfrom(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, &addr_len))
+                    {
+                        // printf("---------FRAME RECEBIDO DPS DO ACK (LOOP DENTRO)------------\n");
+                        // print_frame(&frame_resp);
+                        // printf("-----------------------------------\n");
+                    }
+
+                    if (frame_resp.tipo == 0x1E) // envia ACK aqui?
+                        break;  
+                }
+
+                if (frame_resp.tipo == 0x12) // envia ACK aqui?
+                    printf("%s\n", frame_resp.dados);
             }
 
-            // Quando recebe o primeiro, tem que repetir esse processo
-            // até receber um de tipo "fim_tx"
-            printf("%s\n", frame_resp.dados);
+            printf("\nAcabou lista\n");
         }
 
         if (entrada == 6)

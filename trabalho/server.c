@@ -94,11 +94,52 @@ int main(int argc, char *argv[])
                         return 1;
                     }
 
+                    // Para teste
                     while ((entry = readdir(dir)))
-                        printf("%s\n", entry->d_name); // Para teste
+                    {
+                        if (strcmp(entry->d_name, ".") && strcmp(entry->d_name, ".."))
+                        {
+                            // Preparar e enviar o frame com nome do filme
+
+                            printf("Filme: %s\n", entry->d_name);
+                            
+                            frame_resp.marcadorInicio = 0x7E;
+                            frame_resp.tamanho = (unsigned char)strlen(entry->d_name);
+                            frame_resp.sequencia = 0x00;
+                            frame_resp.tipo = 0x12; // Tipo de dados - 10010
+                            strncpy((char*)frame_resp.dados, entry->d_name, TAM_DADOS-1);
+                            frame_resp.crc8 = calcula_crc(&frame_resp);
+
+                            printf("\n---------FRAME QUE SERÁ ENVIADO (NOME FILME)------------\n");
+                            print_frame(&frame_resp);
+                            printf("-----------------------------------\n");
+
+                            // Envia nome do filme
+                            sendto(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, addr_len);
+
+                        }
+                    }
                     printf("\n");
 
-                     closedir(dir);
+                    closedir(dir);
+
+                    // Envia fim_tx
+
+                    printf("\nFim de transmissão\n");
+
+                    frame_resp.marcadorInicio = 0x7E;
+                    frame_resp.tamanho = 0x00;
+                    frame_resp.sequencia = 0x00;
+                    frame_resp.tipo = 0x1E; // Tipo de dados - 11110
+                    memset(frame_resp.dados, 0, TAM_DADOS);
+                    frame_resp.crc8 = 0x00;;
+
+                    printf("\n---------FRAME QUE SERÁ ENVIADO (FIM TX)------------\n");
+                    print_frame(&frame_resp);
+                    printf("-----------------------------------\n");
+
+                    // Envia nome do filme
+                    sendto(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, addr_len);
                 }
 
                 // recebeu um "BAIXAR"
