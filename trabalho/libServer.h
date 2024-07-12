@@ -43,8 +43,6 @@ void listar_videos(const char *diretorio);
 // Monta a mensagem baseada na estrutura do enunciado e nos parâmetros passados
 frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char tipo, unsigned char* dados);
 
-void send_ack();
-
 // Imprime o frame na tela
 void print_frame(frame_t *frame);
 
@@ -53,5 +51,7 @@ char calcula_crc(frame_t *frame);
 
 // Detecta erros nos dados a partir do crc
 int verifica_crc(frame_t *frame);
+
+void send_ack();
 
 #endif
