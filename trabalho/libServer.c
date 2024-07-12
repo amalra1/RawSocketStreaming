@@ -75,7 +75,7 @@ frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char
 
     memset(frame.dados, 0, TAM_DADOS);
     if (dados != NULL)
-        strncpy(frame.dados, dados, TAM_DADOS - 1); // Ensure null-terminated string
+        strncpy((char*)frame.dados, (char*)dados, TAM_DADOS - 1); // Ensure null-terminated string
 
     return frame;
 }

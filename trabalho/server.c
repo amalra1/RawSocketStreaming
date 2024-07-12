@@ -5,9 +5,9 @@
 int main(int argc, char *argv[]) 
 {
     int sockfd;
-    int ack_enviado = 0;
+    // int ack_enviado = 0;
     int ack_recebido = 0;
-    int frame_recebido = 0;
+    // int frame_recebido = 0;
 
     frame_t frame;
     frame_t frame_resp;
@@ -49,9 +49,29 @@ int main(int argc, char *argv[])
             // Se a mensagem recebida for válida, e não lixo
             if (frame.marcadorInicio == 0x7E)
             {
-                // printf("---------FRAME RECEBIDO------------\n");
-                // print_frame(&frame);
-                // printf("-----------------------------------\n");
+                printf("---------FRAME RECEBIDO------------\n");
+                print_frame(&frame);
+                printf("-----------------------------------\n");
+
+                // Prepara a mensagem de volta (ACK)
+                tam = 0x00;
+                seq = 0x00;
+                tipo = 0x00; // tipo do ACK - 00000
+                memset(dados, 0, TAM_DADOS);
+                crc = 0x00;
+
+                frame_resp = monta_mensagem(tam, seq, tipo, dados);
+                printf("\n---------FRAME QUE SERÁ ENVIADO------------\n");
+                print_frame(&frame_resp);
+                printf("-----------------------------------\n");
+                //send_ack(&frame_resp);
+
+                if (sendto(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, addr_len) < 0)
+                {
+                    perror("Erro ao enviar o ACK:");
+                    return EXIT_FAILURE;
+                }
+                printf("ACK enviado\n");
 
                 if (frame.tipo == 0x00){} // recebeu um "ack"
                 if (frame.tipo == 0x01){} // recebeu um "nack"
@@ -62,7 +82,7 @@ int main(int argc, char *argv[])
                     frame_resp.tamanho = 0x2C; // os 44 bytes da mensagem
                     frame_resp.sequencia = 0x00;
                     frame_resp.tipo = 0x12; // tipo de dados - 10010
-                    strncpy(frame_resp.dados, "Possuímos as seguintes opções de vídeo:\n\n", TAM_DADOS-1);
+                    strncpy((char*)frame_resp.dados, "Possuímos as seguintes opções de vídeo:\n\n", TAM_DADOS-1);
                     frame_resp.crc8 = calcula_crc(&frame_resp);
 
                     send(sockfd, &frame_resp, sizeof(frame_resp), 0);
@@ -96,7 +116,7 @@ int main(int argc, char *argv[])
                     if (dir == NULL)
                     {
                         perror("opendir");
-                        return;
+                        return 1;
                     }
 
                     while ((entry = readdir(dir)))
@@ -112,30 +132,6 @@ int main(int argc, char *argv[])
                 if (frame.tipo == 0x12){} // recebeu um "dados"
                 if (frame.tipo == 0x1E){} // recebeu um "fim tx"
                 if (frame.tipo == 0x1F){} // recebeu um "erro"
-
-                // // Prepara a mensagem de volta (ACK)
-                // inicio = 0x7E; // (0111 1110)
-                // tam = 0x00;
-                // seq = 0x00;
-                // tipo = 0x00; // tipo do ACK - 00000
-                // memset(dados, 0, TAM_DADOS);
-                // crc = 0x00;
-
-                // frame_resp = monta_mensagem(inicio, tam, seq, tipo, dados, crc);
-                // printf("\n---------FRAME QUE SERÁ ENVIADO------------\n");
-                // print_frame(&frame_resp);
-                // printf("-----------------------------------\n");
-                // send_ack(&frame_resp);
-
-                // if (sendto(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, addr_len) < 0)
-                // {
-                //     perror("Erro ao enviar o ACK:");
-                //     return EXIT_FAILURE;
-                // }
-                // printf("ACK enviado\n");
-                // break;
-
-                // ack_enviado = 1;
             }
         }
         else

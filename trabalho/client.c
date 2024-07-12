@@ -33,12 +33,12 @@ int main(int argc, char *argv[])
 
     printf("[1]. Listar todos os filmes\n[2]. Baixar algum filme\n[3]. Mostra na tela(?)\n[4]. Descritor arquivo(?)\n[5]. Dados de algum filme\n[6]. Fechar o Client\n");
 
-    unsigned char inicio;
+    // unsigned char inicio;
     unsigned char tam;
     unsigned char seq;
     unsigned char tipo;
-    char dados[TAM_DADOS];
-    unsigned char crc;
+    unsigned char dados[TAM_DADOS];
+    // unsigned char crc;
 
     int entrada;
 
@@ -63,14 +63,14 @@ int main(int argc, char *argv[])
         // Lista todos os filmes
         if (entrada == 1)
         {
-            inicio = 0x7E; // (0111 1110)
+            // inicio = 0x7E; // (0111 1110)
             tam = 0x00;
             seq = 0x00;
             tipo = 0x0A; // tipo da lista - 01010
             memset(dados, 0, TAM_DADOS);
-            crc = 0x00;
+            // crc = 0x00;
 
-            frame = monta_mensagem(inicio, tam, seq, tipo, dados, crc);
+            frame = monta_mensagem(tam, seq, tipo, dados);
 
             printf("\n---------FRAME QUE SERÁ ENVIADO------------\n");
             print_frame(&frame);
@@ -115,6 +115,9 @@ int main(int argc, char *argv[])
                     }
                 }
             }
+
+            
+
         }
 
         if (entrada == 6)
