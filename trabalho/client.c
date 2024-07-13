@@ -1,5 +1,13 @@
 #include "libServer.h"
 
+// Função auxiliar pra remover o a extensão do arquivo do nome dos filmes
+void remove_ext(char *nome) 
+{
+    char *ponto = strrchr(nome, '.');
+    if (ponto != NULL)
+        *ponto = '\0';
+}
+
 int main(int argc, char *argv[]) 
 {
     int sockfd, entrada;
@@ -128,7 +136,6 @@ int main(int argc, char *argv[])
                     break;
                 }
                      
-
                 while (!eh_dados(&frame_resp)) // Até receber um frame do tipo == "dados"
                 {
                     recvfrom(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, &addr_len);
@@ -185,6 +192,7 @@ int main(int argc, char *argv[])
 
                     printf("---ACK enviado para o server.\n");
 
+                    remove_ext((char*)frame_resp.dados);
                     printf("%s\n", frame_resp.dados);
                 }
             }
