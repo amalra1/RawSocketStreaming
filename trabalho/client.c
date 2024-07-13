@@ -2,7 +2,8 @@
 
 int main(int argc, char *argv[]) 
 {
-    int sockfd;
+    int sockfd, entrada;
+    unsigned char dados[TAM_DADOS];
     struct sockaddr_ll sndr_addr;
     socklen_t addr_len = sizeof(struct sockaddr_ll);
 
@@ -31,13 +32,6 @@ int main(int argc, char *argv[])
 
     printf("[1]. Listar todos os filmes\n[2]. Baixar algum filme\n[3]. Mostra na tela(?)\n[4]. Descritor arquivo(?)\n[5]. Dados de algum filme\n[6]. Fechar o Client\n");
 
-    unsigned char tam;
-    unsigned char seq;
-    unsigned char tipo;
-    unsigned char dados[TAM_DADOS];
-
-    int entrada;
-
     // LOOP PRINCIPAL DO CLIENT
     while (1) 
     {
@@ -59,12 +53,8 @@ int main(int argc, char *argv[])
         // Lista todos os filmes
         if (entrada == 1)  // Escolheu o tipo = Lista
         {
-            tam = 0x00;
-            seq = 0x00;
-            tipo = 0x0A; 
             memset(dados, 0, TAM_DADOS);
-
-            frame = monta_mensagem(tam, seq, tipo, dados);
+            frame = monta_mensagem(0x00, 0x00, 0x0A, dados, 0x00); // Mensagem sem dados - CRC 0x00
 
             printf("\n---------FRAME QUE SERÁ ENVIADO------------\n");
             print_frame(&frame);
@@ -78,7 +68,7 @@ int main(int argc, char *argv[])
             }
 
             // Fica recebendo até receber o ACK (Ou NACK, futuramente)
-            while (frame_resp.tipo != 0x00 || frame_resp.marcadorInicio != 0x7E)
+            while (!eh_ack(&frame_resp))
             {
                 if (recvfrom(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, &addr_len) < 0) 
                 {
@@ -90,7 +80,7 @@ int main(int argc, char *argv[])
                 print_frame(&frame_resp);
                 printf("-----------------------------------\n");
 
-                if (frame_resp.tipo == 0x00 && frame_resp.marcadorInicio == 0x7E)
+                if (eh_ack(&frame_resp))
                     break;
 
                 printf("Mensagem que não é um ACK recebida, recebendo outra...\n");
@@ -103,7 +93,7 @@ int main(int argc, char *argv[])
             printf("Catálogo de filmes disponíveis:\n");
 
             // Começa a receber os dados referentes ao comando "lista"
-            while (frame_resp.tipo != 0x1E) // Até receber um frame do tipo == "fim_tx"
+            while (!eh_fimtx(&frame_resp)) // Até receber um frame do tipo == "fim_tx"
             {
                 // !!!!!!!!!!!! CRC precisa ser calculado nas mensagens que chegam !!!!!!!!!!!!!!!!!
 
@@ -113,18 +103,14 @@ int main(int argc, char *argv[])
                 // print_frame(&frame_resp);
                 // printf("-----------------------------------\n");
 
-                if (frame_resp.tipo == 0x1E)
+                if (eh_fimtx(&frame_resp))
                 {
                     // Envia ACK e termina operação lista
 
                     printf("---Frame indicando final de transmissão recebido do server.\n");
  
-                    tam = 0x00;
-                    seq = 0x00;
-                    tipo = 0x00;
                     memset(dados, 0, TAM_DADOS);
-
-                    frame = monta_mensagem(tam, seq, tipo, dados);
+                    frame = monta_mensagem(0x00, 0x00, 0x00, dados, 0x00);
 
                     // printf("\n---------FRAME QUE SERÁ ENVIADO (ACK)------------\n");
                     // print_frame(&frame);
@@ -143,7 +129,7 @@ int main(int argc, char *argv[])
                 }
                      
 
-                while (frame_resp.tipo != 0x12) // Até receber um frame do tipo == "dados"
+                while (!eh_dados(&frame_resp)) // Até receber um frame do tipo == "dados"
                 {
                     recvfrom(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, &addr_len);
 
@@ -151,18 +137,14 @@ int main(int argc, char *argv[])
                     // print_frame(&frame_resp);
                     // printf("-----------------------------------\n");
 
-                    if (frame_resp.tipo == 0x1E)
+                    if (eh_fimtx(&frame_resp))
                     {
                         // Envia ACK e termina operação lista
 
                         printf("---Frame indicando final de transmissão recebido do server.\n");
     
-                        tam = 0x00;
-                        seq = 0x00;
-                        tipo = 0x00;
                         memset(dados, 0, TAM_DADOS);
-
-                        frame = monta_mensagem(tam, seq, tipo, dados);
+                        frame = monta_mensagem(0x00, 0x00, 0x00, dados, 0x00);
 
                         // printf("\n---------FRAME QUE SERÁ ENVIADO (ACK)------------\n");
                         // print_frame(&frame);
@@ -181,18 +163,14 @@ int main(int argc, char *argv[])
                     }
                 }
 
-                if (frame_resp.tipo == 0x12)
+                if (eh_dados(&frame_resp))
                 { 
                     // Envia ACK e realiza operação com o nome do filme
 
                     printf("---Frame com nome de filme recebido do server.\n");
  
-                    tam = 0x00;
-                    seq = 0x00;
-                    tipo = 0x00;
                     memset(dados, 0, TAM_DADOS);
-
-                    frame = monta_mensagem(tam, seq, tipo, dados);
+                    frame = monta_mensagem(0x00, 0x00, 0x00, dados, 0x00);
 
                     // printf("\n---------FRAME QUE SERÁ ENVIADO (ACK)------------\n");
                     // print_frame(&frame);

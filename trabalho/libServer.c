@@ -64,7 +64,7 @@ void listar_videos(const char *diretorio)
     closedir(dir);
 }
 
-frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char tipo, unsigned char* dados) 
+frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char tipo, unsigned char* dados, unsigned char crc)
 {
     frame_t frame;
     
@@ -72,10 +72,11 @@ frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char
     frame.tamanho = tam;
     frame.sequencia = sequencia;
     frame.tipo = tipo;
+    frame.crc8 = crc;
 
     memset(frame.dados, 0, TAM_DADOS);
     if (dados != NULL)
-        strncpy((char*)frame.dados, (char*)dados, TAM_DADOS - 1); // Ensure null-terminated string
+        strncpy((char*)frame.dados, (char*)dados, TAM_DADOS - 1);
 
     return frame;
 }
@@ -150,3 +151,40 @@ int verifica_crc(frame_t *frame)
     
     return 0;
 }
+
+int eh_ack(frame_t *frame)
+{
+    if (frame->marcadorInicio != 0x7E && frame->tipo != 0x00)
+        return 0;
+    return 1;
+}
+
+int eh_fimtx(frame_t *frame)
+{
+    if (frame->tipo != 0x1E)
+        return 0;
+    return 1;
+}
+
+int eh_dados(frame_t *frame)
+{
+    if (frame->tipo != 0x12)
+        return 0;
+    return 1;
+}
+
+int eh_valida(frame_t *frame)
+{
+    if (frame->marcadorInicio != 0x7E)
+        return 0;
+    return 1;
+}
+
+int eh_lista(frame_t *frame)
+{
+    if (frame->tipo != 0x0A)
+        return 0;
+    return 1;
+}
+
+

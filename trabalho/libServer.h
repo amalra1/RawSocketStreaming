@@ -41,7 +41,7 @@ void inicializa_frame(frame_t *frame);
 void listar_videos(const char *diretorio);
 
 // Monta a mensagem baseada na estrutura do enunciado e nos parâmetros passados
-frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char tipo, unsigned char* dados);
+frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char tipo, unsigned char* dados, unsigned char crc);
 
 // Imprime o frame na tela
 void print_frame(frame_t *frame);
@@ -51,6 +51,21 @@ char calcula_crc(frame_t *frame);
 
 // Detecta erros nos dados a partir do crc
 int verifica_crc(frame_t *frame);
+
+// Analisa o campo MarcadorInicio
+int eh_valida(frame_t *frame);
+
+// Analiza dois campos do frame para ver se é um ACK
+int eh_ack(frame_t *frame);
+
+// Analiza o frame para ver se é um FIM_TX
+int eh_fimtx(frame_t *frame);
+
+// Analiza o frame para ver se é um LISTA
+int eh_lista(frame_t *frame);
+
+// Analiza o frame para ver se é um DADOS
+int eh_dados(frame_t *frame);
 
 void send_ack();
 
