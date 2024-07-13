@@ -98,41 +98,120 @@ int main(int argc, char *argv[])
             }
 
             // Chegou aqui, é porque detectou um ACK
-            printf("ACK recebido.\n");
+            printf("---ACK recebido.\n");
+
+            printf("Catálogo de filmes disponíveis:\n");
 
             // Começa a receber os dados referentes ao comando "lista"
             while (frame_resp.tipo != 0x1E) // Até receber um frame do tipo == "fim_tx"
             {
                 // !!!!!!!!!!!! CRC precisa ser calculado nas mensagens que chegam !!!!!!!!!!!!!!!!!
 
-                if (recvfrom(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, &addr_len))
-                {
-                    // printf("---------FRAME RECEBIDO DPS DO ACK (LOOP FORA)------------\n");
-                    // print_frame(&frame_resp);
-                    // printf("-----------------------------------\n");
-                }
+                recvfrom(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, &addr_len);
 
-                if (frame_resp.tipo == 0x1E) // envia ACK aqui?
-                    break; 
+                // printf("---------FRAME RECEBIDO DPS DO ACK (LOOP FORA)------------\n");
+                // print_frame(&frame_resp);
+                // printf("-----------------------------------\n");
+
+                if (frame_resp.tipo == 0x1E)
+                {
+                    // Envia ACK e termina operação lista
+
+                    printf("---Frame indicando final de transmissão recebido do server.\n");
+ 
+                    tam = 0x00;
+                    seq = 0x00;
+                    tipo = 0x00;
+                    memset(dados, 0, TAM_DADOS);
+
+                    frame = monta_mensagem(tam, seq, tipo, dados);
+
+                    // printf("\n---------FRAME QUE SERÁ ENVIADO (ACK)------------\n");
+                    // print_frame(&frame);
+                    // printf("-----------------------------------\n");
+
+                    // Enviando ACK
+                    if (sendto(sockfd, &frame, sizeof(frame), 0, (struct sockaddr *)&sndr_addr, addr_len) < 0)
+                    {
+                        perror("Erro ao enviar o ACK:");
+                        return EXIT_FAILURE;
+                    }
+
+                    printf("---ACK enviado para o server.\n");
+
+                    break;
+                }
+                     
 
                 while (frame_resp.tipo != 0x12) // Até receber um frame do tipo == "dados"
                 {
-                    if (recvfrom(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, &addr_len))
-                    {
-                        // printf("---------FRAME RECEBIDO DPS DO ACK (LOOP DENTRO)------------\n");
-                        // print_frame(&frame_resp);
-                        // printf("-----------------------------------\n");
-                    }
+                    recvfrom(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, &addr_len);
 
-                    if (frame_resp.tipo == 0x1E) // envia ACK aqui?
-                        break;  
+                    // printf("---------FRAME RECEBIDO DPS DO ACK (LOOP DENTRO)------------\n");
+                    // print_frame(&frame_resp);
+                    // printf("-----------------------------------\n");
+
+                    if (frame_resp.tipo == 0x1E)
+                    {
+                        // Envia ACK e termina operação lista
+
+                        printf("---Frame indicando final de transmissão recebido do server.\n");
+    
+                        tam = 0x00;
+                        seq = 0x00;
+                        tipo = 0x00;
+                        memset(dados, 0, TAM_DADOS);
+
+                        frame = monta_mensagem(tam, seq, tipo, dados);
+
+                        // printf("\n---------FRAME QUE SERÁ ENVIADO (ACK)------------\n");
+                        // print_frame(&frame);
+                        // printf("-----------------------------------\n");
+
+                        // Enviando ACK
+                        if (sendto(sockfd, &frame, sizeof(frame), 0, (struct sockaddr *)&sndr_addr, addr_len) < 0)
+                        {
+                            perror("Erro ao enviar o ACK:");
+                            return EXIT_FAILURE;
+                        }
+
+                        printf("---ACK enviado para o server.\n");
+
+                        break;
+                    }
                 }
 
-                if (frame_resp.tipo == 0x12) // envia ACK aqui?
+                if (frame_resp.tipo == 0x12)
+                { 
+                    // Envia ACK e realiza operação com o nome do filme
+
+                    printf("---Frame com nome de filme recebido do server.\n");
+ 
+                    tam = 0x00;
+                    seq = 0x00;
+                    tipo = 0x00;
+                    memset(dados, 0, TAM_DADOS);
+
+                    frame = monta_mensagem(tam, seq, tipo, dados);
+
+                    // printf("\n---------FRAME QUE SERÁ ENVIADO (ACK)------------\n");
+                    // print_frame(&frame);
+                    // printf("-----------------------------------\n");
+
+                    // Enviando ACK
+                    if (sendto(sockfd, &frame, sizeof(frame), 0, (struct sockaddr *)&sndr_addr, addr_len) < 0)
+                    {
+                        perror("Erro ao enviar o ACK:");
+                        return EXIT_FAILURE;
+                    }
+
+                    printf("---ACK enviado para o server.\n");
+
                     printf("%s\n", frame_resp.dados);
+                }
             }
 
-            printf("\nAcabou lista\n");
+            printf("\nFim da lista.\n");
         }
 
         if (entrada == 6)

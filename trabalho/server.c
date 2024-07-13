@@ -70,19 +70,7 @@ int main(int argc, char *argv[])
                 // recebeu um "LISTA"
                 if (frame.tipo == 0x0A) 
                 {
-                    frame_resp.marcadorInicio = 0x7E;
-                    frame_resp.tamanho = 0x2C; // Os 44 bytes da mensagem
-                    frame_resp.sequencia = 0x00;
-                    frame_resp.tipo = 0x12; // Tipo de dados - 10010
-                    strncpy((char*)frame_resp.dados, "Possuímos as seguintes opções de vídeo:\n\n", TAM_DADOS-1);
-                    frame_resp.crc8 = calcula_crc(&frame_resp);
-
-                    printf("\n---------FRAME QUE SERÁ ENVIADO (TEXTO)------------\n");
-                    print_frame(&frame_resp);
-                    printf("-----------------------------------\n");
-
-                    // Manda frame com texto inicial
-                    sendto(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, addr_len);
+                    printf("Cliente solicitou: LISTA\n");
                     
                     // Vasculha na pasta dos filmes pelos nomes
                     struct dirent *entry;
@@ -94,14 +82,13 @@ int main(int argc, char *argv[])
                         return 1;
                     }
 
-                    // Para teste
                     while ((entry = readdir(dir)))
                     {
                         if (strcmp(entry->d_name, ".") && strcmp(entry->d_name, ".."))
                         {
                             // Preparar e enviar o frame com nome do filme
 
-                            printf("Filme: %s\n", entry->d_name);
+                            printf("Nome do filme que será enviado: %s\n", entry->d_name);
                             
                             frame_resp.marcadorInicio = 0x7E;
                             frame_resp.tamanho = (unsigned char)strlen(entry->d_name);
@@ -117,6 +104,43 @@ int main(int argc, char *argv[])
                             // Envia nome do filme
                             sendto(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, addr_len);
 
+                            printf("Filme %s enviado para o client\n", entry->d_name);
+
+                            // Aguarda pelo recebimento do ACK do client
+
+                            printf("Aguardando recebimento do ACK do client...\n");
+
+                            if (recvfrom(sockfd, &frame, sizeof(frame), 0, (struct sockaddr *)&sndr_addr, &addr_len) < 0) 
+                            {
+                                perror("Erro de recebimento:");
+                                return EXIT_FAILURE;
+                            }
+
+                            printf("---------FRAME RECEBIDO------------\n");
+                            print_frame(&frame);
+                            printf("-----------------------------------\n");
+
+                            // Fica recebendo até ler um ACK
+                            while (frame.tipo != 0x00 || frame.marcadorInicio != 0x7E)
+                            {
+                                if (recvfrom(sockfd, &frame, sizeof(frame), 0, (struct sockaddr *)&sndr_addr, &addr_len) < 0) 
+                                {
+                                    perror("Erro de recebimento:");
+                                    return EXIT_FAILURE;
+                                }
+
+                                printf("---------FRAME RECEBIDO------------\n");
+                                print_frame(&frame);
+                                printf("-----------------------------------\n");
+
+                                if (frame.tipo == 0x00 && frame.marcadorInicio == 0x7E)
+                                    break;
+
+                                printf("Mensagem que não é um ACK recebida, recebendo outra...\n");
+                                memset(&frame, 0, sizeof(frame_t));
+                            }
+
+                            printf("ACK recebido, prosseguindo para enviar próximo filme\n");
                         }
                     }
                     printf("\n");
@@ -125,7 +149,7 @@ int main(int argc, char *argv[])
 
                     // Envia fim_tx
 
-                    printf("\nFim de transmissão\n");
+                    printf("\nFim de transmissão, todos os filmes enviados\n");
 
                     frame_resp.marcadorInicio = 0x7E;
                     frame_resp.tamanho = 0x00;
@@ -138,8 +162,43 @@ int main(int argc, char *argv[])
                     print_frame(&frame_resp);
                     printf("-----------------------------------\n");
 
-                    // Envia nome do filme
+                    // Envia fim_tx
                     sendto(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, addr_len);
+
+                    printf("\nFrame de fim de transmissão enviado ao client\n");
+                    printf("Aguardando recebimento do ACK do client...\n");
+
+                    if (recvfrom(sockfd, &frame, sizeof(frame), 0, (struct sockaddr *)&sndr_addr, &addr_len) < 0) 
+                    {
+                        perror("Erro de recebimento:");
+                        return EXIT_FAILURE;
+                    }
+
+                    printf("---------FRAME RECEBIDO------------\n");
+                    print_frame(&frame);
+                    printf("-----------------------------------\n");
+
+                    // Fica recebendo até ler um ACK
+                    while (frame.tipo != 0x00 || frame.marcadorInicio != 0x7E)
+                    {
+                        if (recvfrom(sockfd, &frame, sizeof(frame), 0, (struct sockaddr *)&sndr_addr, &addr_len) < 0) 
+                        {
+                            perror("Erro de recebimento:");
+                            return EXIT_FAILURE;
+                        }
+
+                        printf("---------FRAME RECEBIDO------------\n");
+                        print_frame(&frame);
+                        printf("-----------------------------------\n");
+
+                        if (frame.tipo == 0x00 && frame.marcadorInicio == 0x7E)
+                            break;
+
+                        printf("Mensagem que não é um ACK recebida, recebendo outra...\n");
+                        memset(&frame, 0, sizeof(frame_t));
+                    }
+
+                    printf("ACK recebido, transmissão finalizada\n");
                 }
 
                 // recebeu um "BAIXAR"
