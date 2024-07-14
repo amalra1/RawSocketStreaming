@@ -1,4 +1,5 @@
 #include "libServer.h"
+#include "pilha.h"
 
 // Função auxiliar pra remover o a extensão do arquivo do nome dos filmes
 void remove_ext(char *nome) 
@@ -44,6 +45,9 @@ int main(int argc, char *argv[])
     frame_t frame_resp;
     inicializa_frame(&frame);
     inicializa_frame(&frame_resp);
+    pilhaString pilhaFilmes;
+
+    inicializa_pilha(&pilhaFilmes);
 
     printf("Iniciando Client ...\n");
 
@@ -66,7 +70,7 @@ int main(int argc, char *argv[])
     // print_frame(&frame);
     // printf("-----------------------------------\n");
 
-    // Envia o frame
+    // Envia o frame com tipo == LISTA
     if (sendto(sockfd, &frame, sizeof(frame), 0, (struct sockaddr *)&endereco, sizeof(endereco)) < 0) 
     {
         perror("Erro no send: ");
@@ -191,11 +195,15 @@ int main(int argc, char *argv[])
             printf("---ACK enviado para o server.\n");
 
             remove_ext((char*)frame_resp.dados);
-            printf("%s\n", frame_resp.dados);
+
+            if (!esta_na_pilha(&pilhaFilmes, (char*)frame_resp.dados))
+                push(&pilhaFilmes, (char*)frame_resp.dados);
         }
     }
 
-    printf("\nFim da lista.\n");
+    printf("\nFilmes no catálogo:\n");
+    for (int i = 0; i <= pilhaFilmes.topo; i++)
+        printf("[%d] %s\n", i + 1, pilhaFilmes.items[i]);
 
     printf("\nOpções:\n[1]. Baixar algum filme\n[2]. Fechar o Client\n");
 
@@ -209,6 +217,9 @@ int main(int argc, char *argv[])
         while (entrada < 1 || entrada > 2)
         {
             limpa_tela();
+            printf("\nFilmes no catálogo:\n");
+            for (int i = 0; i <= pilhaFilmes.topo; i++)
+                printf("[%d] %s\n", i + 1, pilhaFilmes.items[i]);
             printf("\nEntrada inválida, escolha entre [1] e [2]\n");
             printf("\nOpções:\n[1]. Baixar algum filme\n[2]. Fechar o Client\n");
 
