@@ -1,12 +1,15 @@
 #include "libServer.h"
 #include "pilha.h"
 
-// Função auxiliar pra remover o a extensão do arquivo do nome dos filmes
-void remove_ext(char *nome) 
+// Função auxiliar pra remover a extensão do arquivo do nome dos vídeos
+char *remove_ext(char *nome) 
 {
-    char *ponto = strrchr(nome, '.');
-    if (ponto != NULL)
-        *ponto = '\0';
+    char *string = nome;
+    // char *ponto = strrchr(string, '.');
+    // if (ponto != NULL)
+    //     *ponto = '\0';
+
+    return string;
 }
 
 void print_cabecalho_client() 
@@ -30,23 +33,17 @@ void limpa_tela()
 
 int main(int argc, char *argv[]) 
 {
-    int sockfd, entrada;
+    int sockfd, entradaOpcao, entradaVideo, sequencia = 0;
     unsigned char dados[TAM_DADOS];
-    struct sockaddr_ll sndr_addr;
-    socklen_t addr_len = sizeof(struct sockaddr_ll);
 
-    int ifindex = if_nametoindex("lo");
-    struct sockaddr_ll endereco = {0};
-    endereco.sll_family = AF_PACKET;
-    endereco.sll_protocol = htons(ETH_P_ALL);
-    endereco.sll_ifindex = ifindex;
+    FILE *arq;
 
     frame_t frame;
     frame_t frame_resp;
     inicializa_frame(&frame);
     inicializa_frame(&frame_resp);
+   
     pilhaString pilhaFilmes;
-
     inicializa_pilha(&pilhaFilmes);
 
     printf("Iniciando Client ...\n");
@@ -64,174 +61,291 @@ int main(int argc, char *argv[])
     // FASE 1 - INICIAR CLIENT E MOSTRAR OS FILMES DISPONÍVEIS
 
     memset(dados, 0, TAM_DADOS);
-    frame = monta_mensagem(0x00, 0x00, 0x0A, dados, 0x00); // Mensagem sem dados - CRC 0x00
-
-    // printf("\n---------FRAME QUE SERÁ ENVIADO------------\n");
-    // print_frame(&frame);
-    // printf("-----------------------------------\n");
+    frame = monta_mensagem(0x00, 0x00, 0x0A, dados, 0); // Mensagem sem dados - CRC 0x00
 
     // Envia o frame com tipo == LISTA
-    if (sendto(sockfd, &frame, sizeof(frame), 0, (struct sockaddr *)&endereco, sizeof(endereco)) < 0) 
+    if (send(sockfd, &frame, sizeof(frame), 0) < 0)
     {
-        perror("Erro no send: ");
+        perror("Erro no envio:");
         return EXIT_FAILURE;
     }
 
-    // Fica recebendo até receber o ACK (Ou NACK, futuramente)
+    // Aguarda pelo recebimento do ACK do server
+    if (recv(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
+    {
+        perror("Erro no recebimento:");
+        return EXIT_FAILURE;
+    }
     while (!eh_ack(&frame_resp))
     {
-        if (recvfrom(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, &addr_len) < 0) 
+        if (eh_nack(&frame_resp))
         {
-            perror("Erro de recebimento:");
+            if (send(sockfd, &frame, sizeof(frame), 0) < 0)
+            {
+                perror("Erro no envio:");
+                return EXIT_FAILURE;
+            }
+        }
+
+        if (recv(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
+        {
+            perror("Erro no recebimento:");
             return EXIT_FAILURE;
         }
-        
-        // printf("---------FRAME RECEBIDO------------\n");
-        // print_frame(&frame_resp);
-        // printf("-----------------------------------\n");
-
-        if (eh_ack(&frame_resp))
-            break;
-
-        printf("Mensagem que não é um ACK recebida, recebendo outra...\n");
-        memset(&frame_resp, 0, sizeof(frame_t));
     }
-
-    // Chegou aqui, é porque detectou um ACK
-    printf("---ACK recebido.\n");
-
-    printf("Catálogo de filmes disponíveis:\n");
 
     // Começa a receber os dados referentes ao comando "lista"
-    while (!eh_fimtx(&frame_resp)) // Até receber um frame do tipo == "fim_tx"
+    if (recv(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
     {
-        // !!!!!!!!!!!! CRC precisa ser calculado nas mensagens que chegam !!!!!!!!!!!!!!!!!
-
-        recvfrom(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, &addr_len);
-
-        // printf("---------FRAME RECEBIDO DPS DO ACK (LOOP FORA)------------\n");
-        // print_frame(&frame_resp);
-        // printf("-----------------------------------\n");
-
-        if (eh_fimtx(&frame_resp))
+        perror("Erro no recebimento:");
+        return EXIT_FAILURE;
+    }
+    while (!eh_fimtx(&frame_resp)) // Até receber um frame válido do tipo == "fim_tx"
+    {
+        if (eh_valida(&frame_resp))
         {
-            // Envia ACK e termina operação lista
-
-            printf("---Frame indicando final de transmissão recebido do server.\n");
-
-            memset(dados, 0, TAM_DADOS);
-            frame = monta_mensagem(0x00, 0x00, 0x00, dados, 0x00);
-
-            // printf("\n---------FRAME QUE SERÁ ENVIADO (ACK)------------\n");
-            // print_frame(&frame);
-            // printf("-----------------------------------\n");
-
-            // Enviando ACK
-            if (sendto(sockfd, &frame, sizeof(frame), 0, (struct sockaddr *)&sndr_addr, addr_len) < 0)
+            if (eh_dados(&frame_resp))
             {
-                perror("Erro ao enviar o ACK:");
-                return EXIT_FAILURE;
-            }
-
-            printf("---ACK enviado para o server.\n");
-
-            break;
-        }
-                
-        while (!eh_dados(&frame_resp)) // Até receber um frame do tipo == "dados"
-        {
-            recvfrom(sockfd, &frame_resp, sizeof(frame_resp), 0, (struct sockaddr *)&sndr_addr, &addr_len);
-
-            // printf("---------FRAME RECEBIDO DPS DO ACK (LOOP DENTRO)------------\n");
-            // print_frame(&frame_resp);
-            // printf("-----------------------------------\n");
-
-            if (eh_fimtx(&frame_resp))
-            {
-                // Envia ACK e termina operação lista
-
-                printf("---Frame indicando final de transmissão recebido do server.\n");
-
-                memset(dados, 0, TAM_DADOS);
-                frame = monta_mensagem(0x00, 0x00, 0x00, dados, 0x00);
-
-                // printf("\n---------FRAME QUE SERÁ ENVIADO (ACK)------------\n");
-                // print_frame(&frame);
-                // printf("-----------------------------------\n");
-
-                // Enviando ACK
-                if (sendto(sockfd, &frame, sizeof(frame), 0, (struct sockaddr *)&sndr_addr, addr_len) < 0)
+                if (verifica_crc(&frame_resp))
                 {
-                    perror("Erro ao enviar o ACK:");
+                    if (!esta_na_pilha(&pilhaFilmes, (char*)frame_resp.dados))
+                        push(&pilhaFilmes, (char*)frame_resp.dados);
+                    
+                    // Prepara a mensagem de volta (ACK)
+                    memset(dados, 0, TAM_DADOS);
+                    frame = monta_mensagem(0x00, 0x00, 0x00, dados, 0);
+
+                    // Enviando ACK
+                    if (send(sockfd, &frame, sizeof(frame), 0) < 0)
+                    {
+                        perror("Erro no envio:");
+                        return EXIT_FAILURE;
+                    }
+                }
+                else
+                {
+                    // Prepara a mensagem de volta (NACK)
+                    memset(dados, 0, TAM_DADOS);
+                    frame = monta_mensagem(0x00, 0x00, 0x01, dados, 0);
+
+                    // Enviando NACK
+                    if (send(sockfd, &frame, sizeof(frame), 0) < 0)
+                    {
+                        perror("Erro no envio:");
+                        return EXIT_FAILURE;
+                    }
+                }
+            }
+            else
+            {
+                // Prepara a mensagem de volta (NACK)
+                memset(dados, 0, TAM_DADOS);
+                frame = monta_mensagem(0x00, 0x00, 0x01, dados, 0);
+
+                // Enviando NACK
+                if (send(sockfd, &frame, sizeof(frame), 0) < 0)
+                {
+                    perror("Erro no envio:");
                     return EXIT_FAILURE;
                 }
-
-                printf("---ACK enviado para o server.\n");
-
-                break;
             }
         }
 
-        if (eh_dados(&frame_resp))
-        { 
-            // Envia ACK e realiza operação com o nome do filme
-
-            printf("---Frame com nome de filme recebido do server.\n");
-
-            memset(dados, 0, TAM_DADOS);
-            frame = monta_mensagem(0x00, 0x00, 0x00, dados, 0x00);
-
-            // printf("\n---------FRAME QUE SERÁ ENVIADO (ACK)------------\n");
-            // print_frame(&frame);
-            // printf("-----------------------------------\n");
-
-            // Enviando ACK
-            if (sendto(sockfd, &frame, sizeof(frame), 0, (struct sockaddr *)&sndr_addr, addr_len) < 0)
-            {
-                perror("Erro ao enviar o ACK:");
-                return EXIT_FAILURE;
-            }
-
-            printf("---ACK enviado para o server.\n");
-
-            remove_ext((char*)frame_resp.dados);
-
-            if (!esta_na_pilha(&pilhaFilmes, (char*)frame_resp.dados))
-                push(&pilhaFilmes, (char*)frame_resp.dados);
+        if (recv(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
+        {
+            perror("Erro no recebimento:");
+            return EXIT_FAILURE;
         }
     }
 
-    printf("\nFilmes no catálogo:\n");
-    for (int i = 0; i <= pilhaFilmes.topo; i++)
-        printf("[%d] %s\n", i + 1, pilhaFilmes.items[i]);
+    // Frame indicando final de transmissão recebido do server.
 
-    printf("\nOpções:\n[1]. Baixar algum filme\n[2]. Fechar o Client\n");
+    // Prepara a mensagem de volta (ACK)
+    memset(dados, 0, TAM_DADOS);
+    frame = monta_mensagem(0x00, 0x00, 0x00, dados, 0);
+
+    // Enviando ACK
+    if (send(sockfd, &frame, sizeof(frame), 0) < 0)
+    {
+        perror("Erro no envio:");
+        return EXIT_FAILURE;
+    }
 
     // LOOP PRINCIPAL DO CLIENT
     while (1) 
     {
+        printf("\nCatálogo de vídeos disponíveis:\n\n");
+        for (int i = 0; i <= pilhaFilmes.topo; i++)
+            printf("[%d] %s\n", i + 1, remove_ext(pilhaFilmes.items[i]));
+        printf("\nOpções:\n\n[1]. Baixar algum vídeo\n[2]. Fechar o Client\n");
         printf("\nEscolha uma opção: ");
-        scanf("%d", &entrada);
+        scanf("%d", &entradaOpcao);
 
         // Caso entrada inválida
-        while (entrada < 1 || entrada > 2)
+        while (entradaOpcao < 1 || entradaOpcao > 2)
         {
             limpa_tela();
-            printf("\nFilmes no catálogo:\n");
+            printf("\nCatálogo de vídeos disponíveis:\n\n");
             for (int i = 0; i <= pilhaFilmes.topo; i++)
-                printf("[%d] %s\n", i + 1, pilhaFilmes.items[i]);
+                printf("[%d] %s\n", i + 1, remove_ext(pilhaFilmes.items[i]));
             printf("\nEntrada inválida, escolha entre [1] e [2]\n");
-            printf("\nOpções:\n[1]. Baixar algum filme\n[2]. Fechar o Client\n");
+            printf("\nOpções:\n\n[1]. Baixar algum filme\n[2]. Fechar o Client\n");
 
             printf("\nEscolha uma opção: ");
-            scanf("%d", &entrada);
+            scanf("%d", &entradaOpcao);
         }
 
-        printf("Sua opção foi: %d\n", entrada);
+        if (entradaOpcao == 1)
+        {
+            limpa_tela();
+            printf("\nCatálogo de vídeos disponíveis:\n\n");
+            for (int i = 0; i <= pilhaFilmes.topo; i++)
+                printf("[%d] %s\n", i + 1, remove_ext(pilhaFilmes.items[i]));
+            printf("\nEscolha um vídeo para baixar: ");
+            scanf("%d", &entradaVideo);
 
-        if (entrada == 1) {}
+            while (entradaVideo < 1 || entradaVideo > pilhaFilmes.topo + 1)
+            {
+                limpa_tela();
+                printf("\nPor favor, escolha uma opção válida!\n");
+                printf("\nCatálogo de vídeos disponíveis:\n\n");
+                for (int i = 0; i <= pilhaFilmes.topo; i++)
+                    printf("[%d] %s\n", i + 1, remove_ext(pilhaFilmes.items[i]));
+                printf("\nEscolha uma opção: ");
+                scanf("%d", &entradaVideo);
+            }
 
-        if (entrada == 2)
+            printf("\nIniciando Download\n");
+
+            // Prepara e envia o frame com o nome do vídeo
+            strncpy((char*)dados, pilhaFilmes.items[entradaVideo-1], TAM_DADOS-1);
+            frame = monta_mensagem((unsigned char)strlen(pilhaFilmes.items[entradaVideo-1]), 0x00, 0x0B, dados, 1);
+
+            if (send(sockfd, &frame, sizeof(frame), 0) < 0)
+            {
+                perror("Erro no envio:");
+                return EXIT_FAILURE;
+            }
+
+            // Aguarda pelo recebimento do ACK do server
+            if (recv(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
+            {
+                perror("Erro no recebimento:");
+                return EXIT_FAILURE;
+            }
+            while (!eh_ack(&frame_resp))
+            {
+                if (eh_nack(&frame_resp))
+                {
+                    if (send(sockfd, &frame, sizeof(frame), 0) < 0)
+                    {
+                        perror("Erro no envio:");
+                        return EXIT_FAILURE;
+                    }
+                }
+
+                if (recv(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
+                {
+                    perror("Erro no recebimento:");
+                    return EXIT_FAILURE;
+                }
+            }
+
+            // Cria o arquivo que será o vídeo
+            arq = fopen(pilhaFilmes.items[entradaVideo-1], "w+");
+            if (!arq)
+            {
+                perror("Erro ao abrir/criar o arquivo");
+                return EXIT_FAILURE;
+            }
+
+            // Começa a receber os dados referentes ao vídeo pedido
+            if (recv(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
+            {
+                perror("Erro no recebimento:");
+                return EXIT_FAILURE;
+            }
+            while (!eh_fimtx(&frame_resp)) // Até receber um frame válido do tipo == "fim_tx"
+            {
+                if (eh_valida(&frame_resp))
+                {
+                    if (eh_dados(&frame_resp))
+                    {
+                        if (frame_resp.sequencia == sequencia)
+                        {
+                            if (verifica_crc(&frame_resp))
+                            {
+                                fwrite(frame_resp.dados, sizeof(char), frame_resp.tamanho, arq);
+
+                                sequencia = (sequencia + 1) % 32;
+
+                                // Prepara a mensagem de volta (ACK)
+                                memset(dados, 0, TAM_DADOS);
+                                frame = monta_mensagem(0x00, 0x00, 0x00, dados, 0);
+
+                                // Enviando ACK
+                                if (send(sockfd, &frame, sizeof(frame), 0) < 0)
+                                {
+                                    perror("Erro no envio:");
+                                    return EXIT_FAILURE;
+                                }
+                            }
+                            else
+                            {
+                                // Prepara a mensagem de volta (NACK)
+                                memset(dados, 0, TAM_DADOS);
+                                frame = monta_mensagem(0x00, 0x00, 0x01, dados, 0);
+
+                                // Enviando NACK
+                                if (send(sockfd, &frame, sizeof(frame), 0) < 0)
+                                {
+                                    perror("Erro no envio:");
+                                    return EXIT_FAILURE;
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Prepara a mensagem de volta (NACK)
+                        memset(dados, 0, TAM_DADOS);
+                        frame = monta_mensagem(0x00, 0x00, 0x01, dados, 0);
+
+                        // Enviando NACK
+                        if (send(sockfd, &frame, sizeof(frame), 0) < 0)
+                        {
+                            perror("Erro no envio:");
+                            return EXIT_FAILURE;
+                        }
+                    }
+                }
+
+                if (recv(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
+                {
+                    perror("Erro no recebimento:");
+                    return EXIT_FAILURE;
+                }
+            }
+
+            // Frame indicando final de transmissão recebido do server.
+
+            fclose(arq);
+
+            // Prepara a mensagem de volta (ACK)
+            memset(dados, 0, TAM_DADOS);
+            frame = monta_mensagem(0x00, 0x00, 0x00, dados, 0);
+
+            // Enviando ACK
+            if (send(sockfd, &frame, sizeof(frame), 0) < 0)
+            {
+                perror("Erro no envio:");
+                return EXIT_FAILURE;
+            }
+
+            printf("\nDownload realizado com sucesso\n");
+        }
+
+        if (entradaOpcao == 2)
             break;
     }
 

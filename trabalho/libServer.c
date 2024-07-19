@@ -64,7 +64,7 @@ void listar_videos(const char *diretorio)
     closedir(dir);
 }
 
-frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char tipo, unsigned char* dados, unsigned char crc)
+frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char tipo, unsigned char* dados, int crc_flag)
 {
     frame_t frame;
     
@@ -72,11 +72,17 @@ frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char
     frame.tamanho = tam;
     frame.sequencia = sequencia;
     frame.tipo = tipo;
-    frame.crc8 = crc;
 
     memset(frame.dados, 0, TAM_DADOS);
     if (dados != NULL)
         strncpy((char*)frame.dados, (char*)dados, TAM_DADOS - 1);
+
+    // caso seja necessário, calcula o crc
+    if (crc_flag){
+        frame.crc8 = calcula_crc(&frame);
+    } else {
+        frame.crc8 = 0x00;
+    }
 
     return frame;
 }
@@ -122,7 +128,7 @@ void print_frame(frame_t *frame)
     printf("\n\n");
 }
 
-char calcula_crc(frame_t *frame)
+unsigned char calcula_crc(frame_t *frame)
 {
     unsigned char gerador = 0x07; // 8 bits, porque o bit mais significativo é implicitamente 1
     unsigned char crc = 0x00; // inicialmente é 0;
@@ -152,9 +158,23 @@ int verifica_crc(frame_t *frame)
     return 0;
 }
 
+int eh_valida(frame_t *frame)
+{
+    if (frame->marcadorInicio != 0x7E)
+        return 0;
+    return 1;
+}
+
 int eh_ack(frame_t *frame)
 {
-    if (frame->marcadorInicio != 0x7E && frame->tipo != 0x00)
+    if (frame->marcadorInicio != 0x7E || frame->tipo != 0x00)
+        return 0;
+    return 1;
+}
+
+int eh_nack(frame_t *frame)
+{
+    if (frame->marcadorInicio != 0x7E || frame->tipo != 0x01)
         return 0;
     return 1;
 }
@@ -166,20 +186,6 @@ int eh_fimtx(frame_t *frame)
     return 1;
 }
 
-int eh_dados(frame_t *frame)
-{
-    if (frame->tipo != 0x12)
-        return 0;
-    return 1;
-}
-
-int eh_valida(frame_t *frame)
-{
-    if (frame->marcadorInicio != 0x7E)
-        return 0;
-    return 1;
-}
-
 int eh_lista(frame_t *frame)
 {
     if (frame->tipo != 0x0A)
@@ -187,4 +193,16 @@ int eh_lista(frame_t *frame)
     return 1;
 }
 
+int eh_baixar(frame_t *frame)
+{
+    if (frame->tipo != 0x0B)
+        return 0;
+    return 1;
+}
 
+int eh_dados(frame_t *frame)
+{
+    if (frame->tipo != 0x12)
+        return 0;
+    return 1;
+}
