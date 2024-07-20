@@ -275,8 +275,7 @@ int main(int argc, char *argv[])
                         {
                             if (verifica_crc(&frame_resp))
                             {
-                                fwrite(frame_resp.dados, sizeof(char), frame_resp.tamanho, arq);
-
+                                fwrite(frame_resp.dados, sizeof(unsigned char), frame_resp.tamanho, arq);
                                 sequencia = (sequencia + 1) % 32;
 
                                 // Prepara a mensagem de volta (ACK)

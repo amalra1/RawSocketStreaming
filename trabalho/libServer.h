@@ -61,7 +61,7 @@ int eh_ack(frame_t *frame);
 // Analisa dois campos do frame para ver se é um NACK
 int eh_nack(frame_t *frame);
 
-// Analisa o frame para ver se é um FIM_TX
+// Analisa dois campos do frame para ver se é um FIM_TX
 int eh_fimtx(frame_t *frame);
 
 // Analisa o frame para ver se é um LISTA

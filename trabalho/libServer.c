@@ -181,7 +181,7 @@ int eh_nack(frame_t *frame)
 
 int eh_fimtx(frame_t *frame)
 {
-    if (frame->tipo != 0x1E)
+    if (frame->marcadorInicio != 0x7E || frame->tipo != 0x1E)
         return 0;
     return 1;
 }

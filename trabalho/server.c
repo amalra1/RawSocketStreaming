@@ -141,8 +141,6 @@ int main(int argc, char *argv[])
                     {
                         strncpy(videoBuffer, (char*)frame.dados, TAM_DADOS-1);
                         snprintf(caminhoCompleto, TAM_DADOS + 9, "%s%s", diretorio, videoBuffer);
-
-                        printf("%s\n", caminhoCompleto);
                         
                         // Prepara a mensagem de volta (ACK)
                         memset(dados, 0, TAM_DADOS);
@@ -162,10 +160,8 @@ int main(int argc, char *argv[])
                             return EXIT_FAILURE;
                         }
 
-                        printf ("Aq chegou\n");
-                        while ((bytesEscritos = fread(dados, sizeof(char), TAM_DADOS, arq)) > 0)
+                        while ((bytesEscritos = fread(dados, sizeof(unsigned char), TAM_DADOS-1, arq)) > 0)
                         {
-                            printf("Entrou no looping...\n");
                             // Prepara e envia o frame com os dados do vídeo
                             frame_resp = monta_mensagem((unsigned char)bytesEscritos, (unsigned char)sequencia, 0x12, dados, 1);
                             sequencia = (sequencia + 1) % 32;
@@ -200,7 +196,6 @@ int main(int argc, char *argv[])
                                 }
                             }
                         }
-                        printf ("Aq tbm\n");
 
                         fclose(arq);
 
