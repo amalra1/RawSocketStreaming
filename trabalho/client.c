@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    limpa_tela();
+    //limpa_tela();
 
     // FASE 1 - INICIAR CLIENT E MOSTRAR OS FILMES DISPONÍVEIS
 
@@ -175,8 +175,10 @@ int main(int argc, char *argv[])
     while (1) 
     {
         printf("\nCatálogo de vídeos disponíveis:\n\n");
+
         for (int i = 0; i <= pilhaFilmes.topo; i++)
             printf("[%d] %s\n", i + 1, remove_ext(pilhaFilmes.items[i]));
+
         printf("\nOpções:\n\n[1]. Baixar algum vídeo\n[2]. Fechar o Client\n");
         printf("\nEscolha uma opção: ");
         scanf("%d", &entradaOpcao);
@@ -186,8 +188,10 @@ int main(int argc, char *argv[])
         {
             limpa_tela();
             printf("\nCatálogo de vídeos disponíveis:\n\n");
+
             for (int i = 0; i <= pilhaFilmes.topo; i++)
                 printf("[%d] %s\n", i + 1, remove_ext(pilhaFilmes.items[i]));
+
             printf("\nEntrada inválida, escolha entre [1] e [2]\n");
             printf("\nOpções:\n\n[1]. Baixar algum filme\n[2]. Fechar o Client\n");
 
@@ -197,20 +201,24 @@ int main(int argc, char *argv[])
 
         if (entradaOpcao == 1)
         {
-            limpa_tela();
+            //limpa_tela();
             printf("\nCatálogo de vídeos disponíveis:\n\n");
+
             for (int i = 0; i <= pilhaFilmes.topo; i++)
                 printf("[%d] %s\n", i + 1, remove_ext(pilhaFilmes.items[i]));
+
             printf("\nEscolha um vídeo para baixar: ");
             scanf("%d", &entradaVideo);
 
             while (entradaVideo < 1 || entradaVideo > pilhaFilmes.topo + 1)
             {
-                limpa_tela();
+                //limpa_tela();
                 printf("\nPor favor, escolha uma opção válida!\n");
                 printf("\nCatálogo de vídeos disponíveis:\n\n");
+
                 for (int i = 0; i <= pilhaFilmes.topo; i++)
                     printf("[%d] %s\n", i + 1, remove_ext(pilhaFilmes.items[i]));
+
                 printf("\nEscolha uma opção: ");
                 scanf("%d", &entradaVideo);
             }
@@ -227,6 +235,8 @@ int main(int argc, char *argv[])
                 return EXIT_FAILURE;
             }
 
+            printf("Frame com titulo do filme enviado para o server\n\n");
+
             // Aguarda pelo recebimento do ACK do server
             if (recv(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
             {
@@ -237,11 +247,15 @@ int main(int argc, char *argv[])
             {
                 if (eh_nack(&frame_resp))
                 {
+                    printf("NACK recebido\n\n");
+
                     if (send(sockfd, &frame, sizeof(frame), 0) < 0)
                     {
                         perror("Erro no envio:");
                         return EXIT_FAILURE;
                     }
+
+                    printf("Titulo do filme enviado novamente para o server\n\n");
                 }
 
                 if (recv(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
@@ -250,6 +264,8 @@ int main(int argc, char *argv[])
                     return EXIT_FAILURE;
                 }
             }
+
+            printf("ACK recebido pelo server\n\n");
 
             // Cria o arquivo que será o vídeo
             arq = fopen(pilhaFilmes.items[entradaVideo-1], "w+");
@@ -265,18 +281,27 @@ int main(int argc, char *argv[])
                 perror("Erro no recebimento:");
                 return EXIT_FAILURE;
             }
+            
             while (!eh_fimtx(&frame_resp)) // Até receber um frame válido do tipo == "fim_tx"
             {
                 if (eh_valida(&frame_resp))
                 {
                     if (eh_dados(&frame_resp))
                     {
+                        printf("--------------FRAME RECEBIDO (Dados)--------------\n");
+                        print_frame(&frame_resp);
+                        printf("--------------------------------------------------\n");
+
                         if (frame_resp.sequencia == sequencia)
                         {
                             if (verifica_crc(&frame_resp))
                             {
+                                printf("CRC Validado com sucesso\n\n");
+
                                 fwrite(frame_resp.dados, sizeof(unsigned char), frame_resp.tamanho, arq);
                                 sequencia = (sequencia + 1) % 32;
+
+                                printf("Operação com os dados realizada\n\n");
 
                                 // Prepara a mensagem de volta (ACK)
                                 memset(dados, 0, TAM_DADOS);
@@ -288,9 +313,13 @@ int main(int argc, char *argv[])
                                     perror("Erro no envio:");
                                     return EXIT_FAILURE;
                                 }
+
+                                printf("ACK Enviado para o server\n\n");
                             }
                             else
                             {
+                                printf("Verificação do CRC falhou\n\n");
+
                                 // Prepara a mensagem de volta (NACK)
                                 memset(dados, 0, TAM_DADOS);
                                 frame = monta_mensagem(0x00, 0x00, 0x01, dados, 0);
@@ -301,11 +330,15 @@ int main(int argc, char *argv[])
                                     perror("Erro no envio:");
                                     return EXIT_FAILURE;
                                 }
+
+                                printf("NACK enviado para o server\n\n");
                             }
                         }
                     }
                     else
                     {
+                        printf("Não-dados recebido\n\n");
+
                         // Prepara a mensagem de volta (NACK)
                         memset(dados, 0, TAM_DADOS);
                         frame = monta_mensagem(0x00, 0x00, 0x01, dados, 0);
@@ -316,6 +349,8 @@ int main(int argc, char *argv[])
                             perror("Erro no envio:");
                             return EXIT_FAILURE;
                         }
+
+                        printf("NACK enviado para o server\n\n");
                     }
                 }
 
@@ -327,6 +362,8 @@ int main(int argc, char *argv[])
             }
 
             // Frame indicando final de transmissão recebido do server.
+            if (eh_fimtx(&frame_resp))
+                printf("Frame indicando final de transmissão recebido do server\n\n");
 
             fclose(arq);
 
@@ -340,6 +377,8 @@ int main(int argc, char *argv[])
                 perror("Erro no envio:");
                 return EXIT_FAILURE;
             }
+
+            printf("ACK enviado para o server\n\n");
 
             printf("\nDownload realizado com sucesso\n");
         }
