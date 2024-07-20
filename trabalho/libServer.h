@@ -43,6 +43,9 @@ void listar_videos(const char *diretorio);
 // Monta a mensagem baseada na estrutura do enunciado e nos parâmetros passados
 frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char tipo, unsigned char* dados, int crc_flag);
 
+// Para printar os bits de cada campo do frame
+void print_bits(unsigned char byte, int num_bits); 
+
 // Imprime o frame na tela
 void print_frame(frame_t *frame);
 
