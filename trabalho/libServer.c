@@ -87,10 +87,6 @@ frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char
     return frame;
 }
 
-void send_ack()
-{
-}
-
 // Função interna para imprimir os bits de cada byte
 void print_bits(unsigned char byte, int num_bits) 
 {
@@ -128,6 +124,76 @@ void print_frame(frame_t *frame)
     printf("\n\n");
 }
 
+int send_ack(int sockfd)
+{
+    frame_t frame;
+    unsigned char dados[TAM_DADOS];
+
+    // Prepara a mensagem de volta (ACK)
+    memset(dados, 0, TAM_DADOS);
+    frame = monta_mensagem(0x00, 0x00, 0x00, dados, 0);
+
+    // Enviando ACK
+    if (send(sockfd, &frame, sizeof(frame), 0) < 0)
+    {
+        perror("Erro no envio:");
+        return 0;
+    }
+    
+    return 1;
+}
+
+int send_nack(int sockfd)
+{
+    frame_t frame;
+    unsigned char dados[TAM_DADOS];
+
+    // Prepara a mensagem de volta (NACK)
+    memset(dados, 0, TAM_DADOS);
+    frame = monta_mensagem(0x00, 0x00, 0x01, dados, 0);
+
+    // Enviando NACK
+    if (send(sockfd, &frame, sizeof(frame), 0) < 0)
+    {
+        perror("Erro no envio:");
+        return 0;
+    }
+
+    return 1;
+}
+
+int wait_ack(int sockfd, frame_t *frame_envio)
+{
+    frame_t frame_recebimento;
+
+    // Aguarda pelo recebimento do ACK do server
+    if (recv(sockfd, &frame_recebimento, sizeof(frame_recebimento), 0) < 0)
+    {
+        perror("Erro no recebimento:");
+        return 0;
+    }
+
+    while (!eh_ack(&frame_recebimento))
+    {
+        if (eh_nack(&frame_recebimento))
+        {
+            if (send(sockfd, &frame_envio, sizeof(frame_envio), 0) < 0)
+            {
+                perror("Erro no envio:");
+                return 0;
+            }
+        }
+
+        if (recv(sockfd, &frame_recebimento, sizeof(frame_recebimento), 0) < 0)
+        {
+            perror("Erro no recebimento:");
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 unsigned char calcula_crc(frame_t *frame)
 {
     unsigned char gerador = 0x07; // 8 bits, porque o bit mais significativo é implicitamente 1
@@ -158,13 +224,6 @@ int verifica_crc(frame_t *frame)
     return 0;
 }
 
-int eh_valida(frame_t *frame)
-{
-    if (frame->marcadorInicio != 0x7E)
-        return 0;
-    return 1;
-}
-
 int eh_ack(frame_t *frame)
 {
     if (frame->marcadorInicio != 0x7E || frame->tipo != 0x00)
@@ -188,21 +247,21 @@ int eh_fimtx(frame_t *frame)
 
 int eh_lista(frame_t *frame)
 {
-    if (frame->tipo != 0x0A)
+    if (frame->marcadorInicio != 0x7E || frame->tipo != 0x0A)
         return 0;
     return 1;
 }
 
 int eh_baixar(frame_t *frame)
 {
-    if (frame->tipo != 0x0B)
+    if (frame->marcadorInicio != 0x7E || frame->tipo != 0x0B)
         return 0;
     return 1;
 }
 
 int eh_dados(frame_t *frame)
 {
-    if (frame->tipo != 0x12)
+    if (frame->marcadorInicio != 0x7E || frame->tipo != 0x12)
         return 0;
     return 1;
 }
