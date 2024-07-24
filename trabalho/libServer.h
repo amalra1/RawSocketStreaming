@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netpacket/packet.h>
 #include <net/ethernet.h>
 #include <net/if.h>
@@ -37,9 +38,6 @@ int cria_raw_socket(char* nome_interface_rede);
 // Preenche todo o frame com 0's
 void inicializa_frame(frame_t *frame);
 
-// Lista os vídeos presentes no diretório vídeos
-void listar_videos(const char *diretorio);
-
 // Monta a mensagem baseada na estrutura do enunciado e nos parâmetros passados
 frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char tipo, unsigned char* dados, int crc_flag);
 
@@ -55,8 +53,8 @@ int send_ack(int sockfd);
 // Envia um NACK através do socket
 int send_nack(int sockfd);
 
-// Espera pelo ACK e trata eventuais NACK
-int wait_ack(int sockfd, frame_t *frame_envio);
+// Espera pelo ACK (com timeout) e trata eventuais NACK
+int wait_ack(int sockfd, frame_t *frame_envio, int tempo_timeout);
 
 // Calcula o CRC-8 da mensagem e o retorna
 unsigned char calcula_crc(frame_t *frame);
@@ -70,9 +68,6 @@ int eh_ack(frame_t *frame);
 // Analisa se a mensagem é válida e se é um NACK
 int eh_nack(frame_t *frame);
 
-// Analisa se a mensagem é válida e se é um FIM_TX
-int eh_fimtx(frame_t *frame);
-
 // Analisa se a mensagem é válida e se é um LISTA
 int eh_lista(frame_t *frame);
 
@@ -81,5 +76,8 @@ int eh_baixar(frame_t *frame);
 
 // Analisa se a mensagem é válida e se é um DADOS
 int eh_dados(frame_t *frame);
+
+// Analisa se a mensagem é válida e se é um FIM_TX
+int eh_fimtx(frame_t *frame);
 
 #endif

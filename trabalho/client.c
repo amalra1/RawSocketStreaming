@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    if (!wait_ack(sockfd, &frame))
+    if (!wait_ack(sockfd, &frame, 1000))
         return EXIT_FAILURE;
 
     // Começa a receber os dados referentes ao comando "lista"
@@ -87,6 +87,9 @@ int main(int argc, char *argv[])
         {
             if (verifica_crc(&frame_resp))
             {
+                // Mesmo que o server não tenha recebido o ACK da iteração anterior,
+                // e esteja reenviando o nome do vídeo, essa verificação garante que
+                // o mesmo nome não seja considerado mais de uma vez...
                 if (!esta_na_pilha(&pilhaFilmes, (char*)frame_resp.dados))
                     push(&pilhaFilmes, (char*)frame_resp.dados);
                 
@@ -176,7 +179,7 @@ int main(int argc, char *argv[])
                 return EXIT_FAILURE;
             }
 
-            if (!wait_ack(sockfd, &frame))
+            if (!wait_ack(sockfd, &frame, 1000))
                 return EXIT_FAILURE;
 
             // Cria o arquivo que será o vídeo
@@ -197,19 +200,33 @@ int main(int argc, char *argv[])
             // Se pega um FIM_TX sem querer da placa de rede
             while (eh_fimtx(&frame_resp))
             {
-                printf("Pegou FIM_TX sem querer\n");
-
                 if (recv(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
                 {
                     perror("Erro no recebimento:");
                     return EXIT_FAILURE;
                 }
             }
-            
+
             while (!eh_fimtx(&frame_resp)) // Até receber um frame válido do tipo == "fim_tx"
             {
                 if (eh_dados(&frame_resp))
                 {
+                    // Pode ocorrer de o server não receber o ACK pela mensagem anterior.
+                    // Nesse sentido, ele ficaria reenviando até receber um ACK:
+                    if (sequencia == 0)
+                    {
+                        if (frame_resp.sequencia == 31)
+                        {
+                            if (!send_ack(sockfd))
+                                return EXIT_FAILURE;
+                        }
+                    }
+                    else if (frame_resp.sequencia == sequencia - 1)
+                    {
+                        if (!send_ack(sockfd))
+                            return EXIT_FAILURE;
+                    }
+
                     if (frame_resp.sequencia == sequencia)
                     {
                         if (verifica_crc(&frame_resp))

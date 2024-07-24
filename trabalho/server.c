@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
                         return EXIT_FAILURE;
                     }
 
-                    if (!wait_ack(sockfd, &frame_resp))
+                    if (!wait_ack(sockfd, &frame_resp, 1000))
                         return EXIT_FAILURE;
                 }
             }
@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
                 return EXIT_FAILURE;
             }
 
-            if (!wait_ack(sockfd, &frame_resp))
+            if (!wait_ack(sockfd, &frame_resp, 1000))
                 return EXIT_FAILURE;
         }
         
@@ -117,7 +117,7 @@ int main(int argc, char *argv[])
                         return EXIT_FAILURE;
                     }
 
-                    if (!wait_ack(sockfd, &frame_resp))
+                    if (!wait_ack(sockfd, &frame_resp, 1000))
                         return EXIT_FAILURE;
                 }
 
@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
                     return EXIT_FAILURE;
                 }
 
-                if (!wait_ack(sockfd, &frame_resp))
+                if (!wait_ack(sockfd, &frame_resp, 1000))
                     return EXIT_FAILURE;
             }
             else

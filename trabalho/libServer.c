@@ -46,24 +46,6 @@ void inicializa_frame(frame_t *frame)
     memset(frame->dados, 0, TAM_DADOS);
 }
 
-void listar_videos(const char *diretorio)
-{
-    struct dirent *entry;
-
-    DIR *dir = opendir(diretorio);
-    if (dir == NULL)
-    {
-        perror("opendir");
-        return;
-    }
-
-    while ((entry = readdir(dir)))
-        printf("%s\n", entry->d_name);
-    printf("\n");
-
-    closedir(dir);
-}
-
 frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char tipo, unsigned char* dados, int crc_flag)
 {
     frame_t frame;
@@ -162,9 +144,18 @@ int send_nack(int sockfd)
     return 1;
 }
 
-int wait_ack(int sockfd, frame_t *frame_envio)
+// Retorna o tempo atual em milissegundos
+long long timestamp()
+{
+    struct timeval tp;
+    gettimeofday(&tp, NULL);
+    return (long long)tp.tv_sec * 1000 + tp.tv_usec / 1000;
+}
+
+int wait_ack(int sockfd, frame_t *frame_envio, int tempo_timeout)
 {
     frame_t frame_recebimento;
+    long long marcador_tempo = 0, tempo_inicial = timestamp();
 
     // Aguarda pelo recebimento do ACK do server
     if (recv(sockfd, &frame_recebimento, sizeof(frame_recebimento), 0) < 0)
@@ -172,16 +163,37 @@ int wait_ack(int sockfd, frame_t *frame_envio)
         perror("Erro no recebimento:");
         return 0;
     }
-
-    while (!eh_ack(&frame_recebimento))
+    while (!eh_ack(&frame_recebimento) && (marcador_tempo = timestamp() - tempo_inicial) < tempo_timeout)
     {
         if (eh_nack(&frame_recebimento))
         {
-            if (send(sockfd, &frame_envio, sizeof(frame_envio), 0) < 0)
+            if (send(sockfd, frame_envio, sizeof(*frame_envio), 0) < 0)
             {
                 perror("Erro no envio:");
                 return 0;
             }
+
+            // Reinicia o timeout
+            tempo_inicial = timestamp();
+        }
+
+        // Situações decorrentes do não recebimento do ACK pela contraparte:
+        // -> Client pede lista, server manda o ACK mas client não recebe...
+        // -> Server envia um fim_tx, client manda o ACK mas server não recebe...
+        // -> Client pede para baixar, server manda o ACK mas client não recebe...
+        if (eh_lista(&frame_recebimento) || eh_fimtx(&frame_recebimento) || (eh_baixar(&frame_recebimento) && eh_dados(frame_envio)))
+        {
+            if (!send_ack(sockfd))
+                return 0;
+
+            if (send(sockfd, frame_envio, sizeof(*frame_envio), 0) < 0)
+            {
+                perror("Erro no envio:");
+                return 0;
+            }
+
+            // Reinicia o timeout
+            tempo_inicial = timestamp();
         }
 
         if (recv(sockfd, &frame_recebimento, sizeof(frame_recebimento), 0) < 0)
@@ -189,6 +201,19 @@ int wait_ack(int sockfd, frame_t *frame_envio)
             perror("Erro no recebimento:");
             return 0;
         }
+    }
+
+    // Caso tenha atingido o timeout, reenvia a msg e recursivamente espera pelo ACK
+    if (marcador_tempo >= tempo_timeout)
+    {
+        if (send(sockfd, frame_envio, sizeof(*frame_envio), 0) < 0)
+        {
+            perror("Erro no envio:");
+            return 0;
+        }
+
+        if (!wait_ack(sockfd, frame_envio, tempo_timeout * 2))
+            return 0;
     }
 
     return 1;
@@ -238,13 +263,6 @@ int eh_nack(frame_t *frame)
     return 1;
 }
 
-int eh_fimtx(frame_t *frame)
-{
-    if (frame->marcadorInicio != 0x7E || frame->tipo != 0x1E)
-        return 0;
-    return 1;
-}
-
 int eh_lista(frame_t *frame)
 {
     if (frame->marcadorInicio != 0x7E || frame->tipo != 0x0A)
@@ -262,6 +280,13 @@ int eh_baixar(frame_t *frame)
 int eh_dados(frame_t *frame)
 {
     if (frame->marcadorInicio != 0x7E || frame->tipo != 0x12)
+        return 0;
+    return 1;
+}
+
+int eh_fimtx(frame_t *frame)
+{
+    if (frame->marcadorInicio != 0x7E || frame->tipo != 0x1E)
         return 0;
     return 1;
 }
