@@ -42,16 +42,16 @@ void inicializa_frame(frame_t *frame);
 frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char tipo, unsigned char* dados, int crc_flag);
 
 // Para printar os bits de cada campo do frame
-void print_bits(unsigned char byte, int num_bits); 
+void print_bits(unsigned char byte, int num_bits, FILE *arq); 
 
 // Imprime o frame na tela
-void print_frame(frame_t *frame);
+void print_frame(frame_t *frame, FILE *arq);
 
 // Envia um ACK através do socket
-int send_ack(int sockfd);
+int send_ack(int sockfd, unsigned char sequencia);
 
 // Envia um NACK através do socket
-int send_nack(int sockfd);
+int send_nack(int sockfd, unsigned char sequencia);
 
 // Espera pelo ACK (com timeout) e trata eventuais NACK
 int wait_ack(int sockfd, frame_t *frame_envio, int tempo_timeout);

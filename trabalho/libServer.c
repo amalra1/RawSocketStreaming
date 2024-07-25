@@ -70,50 +70,49 @@ frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char
 }
 
 // Função interna para imprimir os bits de cada byte
-void print_bits(unsigned char byte, int num_bits) 
+void print_bits(unsigned char byte, int num_bits, FILE *arq) 
 {
     for (int i = num_bits - 1; i >= 0; --i)
-        printf("%d", (byte >> i) & 1);
+        fprintf(arq, "%d", (byte >> i) & 1);
 }
 
-void print_frame(frame_t *frame) 
+void print_frame(frame_t *frame, FILE *arq) 
 {
-    printf("\nMarcador de inicio: ");
-    print_bits(frame->marcadorInicio, 8);
-    printf("\n");
+    fprintf(arq, "\nMarcador de inicio: ");
+    print_bits(frame->marcadorInicio, 8, arq);
+    fprintf(arq, "\n");
 
-    printf("Tamanho: ");
-    print_bits(frame->tamanho, 6);
-    printf("\n");
+    fprintf(arq, "Tamanho: ");
+    print_bits(frame->tamanho, 6, arq);
+    fprintf(arq, "\n");
 
-    printf("Sequência: ");
-    print_bits(frame->sequencia, 5);
-    printf("\n");
+    fprintf(arq, "Sequência: ");
+    print_bits(frame->sequencia, 5, arq);
+    fprintf(arq, "\n");
 
-    printf("Tipo: ");
-    print_bits(frame->tipo, 5);
-    printf("\n");
+    fprintf(arq, "Tipo: ");
+    print_bits(frame->tipo, 5, arq);
+    fprintf(arq, "\n");
 
-    printf("Dados: ");
-    for (int i = 0; i < TAM_DADOS; ++i) {
-        print_bits(frame->dados[i], 8);
-        printf(" ");
+    fprintf(arq, "Dados: ");
+    for (int i = 0; i < TAM_DADOS-1; ++i) {
+        print_bits(frame->dados[i], 8, arq);
     }
-    printf("\n");
+    fprintf(arq, "\n");
 
-    printf("Crc-8: ");
-    print_bits(frame->crc8, 8);
-    printf("\n\n");
+    fprintf(arq, "Crc-8: ");
+    print_bits(frame->crc8, 8, arq);
+    fprintf(arq, "\n\n");
 }
 
-int send_ack(int sockfd)
+int send_ack(int sockfd, unsigned char sequencia)
 {
     frame_t frame;
     unsigned char dados[TAM_DADOS];
 
     // Prepara a mensagem de volta (ACK)
     memset(dados, 0, TAM_DADOS);
-    frame = monta_mensagem(0x00, 0x00, 0x00, dados, 0);
+    frame = monta_mensagem(0x00, sequencia, 0x00, dados, 0);
 
     // Enviando ACK
     if (send(sockfd, &frame, sizeof(frame), 0) < 0)
@@ -125,14 +124,14 @@ int send_ack(int sockfd)
     return 1;
 }
 
-int send_nack(int sockfd)
+int send_nack(int sockfd, unsigned char sequencia)
 {
     frame_t frame;
     unsigned char dados[TAM_DADOS];
 
     // Prepara a mensagem de volta (NACK)
     memset(dados, 0, TAM_DADOS);
-    frame = monta_mensagem(0x00, 0x00, 0x01, dados, 0);
+    frame = monta_mensagem(0x00, sequencia, 0x01, dados, 0);
 
     // Enviando NACK
     if (send(sockfd, &frame, sizeof(frame), 0) < 0)
@@ -163,9 +162,9 @@ int wait_ack(int sockfd, frame_t *frame_envio, int tempo_timeout)
         perror("Erro no recebimento:");
         return 0;
     }
-    while (!eh_ack(&frame_recebimento) && (marcador_tempo = timestamp() - tempo_inicial) < tempo_timeout)
+    while (!(eh_ack(&frame_recebimento) && frame_recebimento.sequencia == frame_envio->sequencia) && (marcador_tempo = timestamp() - tempo_inicial) < tempo_timeout)
     {
-        if (eh_nack(&frame_recebimento))
+        if (eh_nack(&frame_recebimento) && frame_recebimento.sequencia == frame_envio->sequencia)
         {
             if (send(sockfd, frame_envio, sizeof(*frame_envio), 0) < 0)
             {
@@ -183,8 +182,16 @@ int wait_ack(int sockfd, frame_t *frame_envio, int tempo_timeout)
         // -> Client pede para baixar, server manda o ACK mas client não recebe...
         if (eh_lista(&frame_recebimento) || eh_fimtx(&frame_recebimento) || (eh_baixar(&frame_recebimento) && eh_dados(frame_envio)))
         {
-            if (!send_ack(sockfd))
-                return 0;
+            if (frame_envio->sequencia == 0)
+            {
+                if (!send_ack(sockfd, (unsigned char)31))
+                    return 0;
+            }
+            else
+            {
+                if (!send_ack(sockfd, frame_envio->sequencia - 1))
+                    return 0;
+            }
 
             if (send(sockfd, frame_envio, sizeof(*frame_envio), 0) < 0)
             {

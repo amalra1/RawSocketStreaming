@@ -7,7 +7,7 @@ int main(int argc, char *argv[])
     char videoBuffer[TAM_DADOS], caminhoCompleto[TAM_DADOS + 9];
     char *diretorio = "./videos/";
 
-    FILE *arq;
+    FILE *arq, *arquivoTesteServer;
 
     frame_t frame;
     frame_t frame_resp;
@@ -38,8 +38,10 @@ int main(int argc, char *argv[])
         // recebeu um "LISTA"
         if (eh_lista(&frame))
         {
-            if (!send_ack(sockfd))
+            if (!send_ack(sockfd, sequencia))
                 return EXIT_FAILURE;
+
+            sequencia = (sequencia + 1) % 32;
             
             // Vasculha na pasta dos vídeos pelos nomes
             struct dirent *entry;
@@ -57,7 +59,9 @@ int main(int argc, char *argv[])
                 {
                     // Prepara e envia o frame com o nome do vídeo
                     strncpy((char*)dados, entry->d_name, TAM_DADOS-1);
-                    frame_resp = monta_mensagem((unsigned char)strlen(entry->d_name), 0x00, 0x12, dados, 1);
+                    frame_resp = monta_mensagem((unsigned char)strlen(entry->d_name), sequencia, 0x12, dados, 1);
+
+                    sequencia = (sequencia + 1) % 32;
 
                     if (send(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
                     {
@@ -74,7 +78,8 @@ int main(int argc, char *argv[])
 
             // Prepara FIM_TX
             memset(dados, 0, TAM_DADOS);
-            frame_resp = monta_mensagem(0x00, 0x00, 0x1E, dados, 0);
+            frame_resp = monta_mensagem(0x00, sequencia, 0x1E, dados, 0);
+            sequencia = (sequencia + 1) % 32;
 
             // Envia FIM_TX
             if (send(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
@@ -92,8 +97,10 @@ int main(int argc, char *argv[])
         {
             if (verifica_crc(&frame))
             {
-                if (!send_ack(sockfd))
+                if (!send_ack(sockfd, sequencia))
                     return EXIT_FAILURE;
+
+                sequencia = (sequencia + 1) % 32;
 
                 strncpy(videoBuffer, (char*)frame.dados, TAM_DADOS-1);
                 snprintf(caminhoCompleto, TAM_DADOS + 9, "%s%s", diretorio, videoBuffer);
@@ -105,11 +112,20 @@ int main(int argc, char *argv[])
                     return EXIT_FAILURE;
                 }
 
+                arquivoTesteServer = fopen("ArquivoTesteServer", "wb");
+                if (!arquivoTesteServer)
+                {
+                    perror("Erro ao abrir/criar o arquivo");
+                    return EXIT_FAILURE;
+                }
+
                 while ((bytesEscritos = fread(dados, sizeof(unsigned char), TAM_DADOS-1, arq)) > 0)
                 {
                     // Prepara e envia o frame com os dados do vídeo
-                    frame_resp = monta_mensagem((unsigned char)bytesEscritos, (unsigned char)sequencia, 0x12, dados, 1);
+                    frame_resp = monta_mensagem((unsigned char)bytesEscritos, sequencia, 0x12, dados, 1);
                     sequencia = (sequencia + 1) % 32;
+
+                    print_frame(&frame_resp, arquivoTesteServer);
 
                     if (send(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
                     {
@@ -122,10 +138,12 @@ int main(int argc, char *argv[])
                 }
 
                 fclose(arq);
+                fclose(arquivoTesteServer);
 
                 // Prepara FIM_TX
                 memset(dados, 0, TAM_DADOS);
-                frame_resp = monta_mensagem(0x00, 0x00, 0x1E, dados, 0);
+                frame_resp = monta_mensagem(0x00, sequencia, 0x1E, dados, 0);
+                sequencia = (sequencia + 1) % 32;
 
                 // Envia FIM_TX
                 if (send(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
@@ -139,7 +157,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                if (!send_nack(sockfd))
+                if (!send_nack(sockfd, sequencia))
                     return EXIT_FAILURE;
             }
         }

@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
     int sockfd, entradaOpcao, entradaVideo;
     unsigned char dados[TAM_DADOS], sequencia = 0;
 
-    FILE *arq;
+    FILE *arq, *arquivoTesteCliente;
 
     frame_t frame;
     frame_t frame_resp;
@@ -61,7 +61,8 @@ int main(int argc, char *argv[])
     // INICIA CLIENT E MOSTRA OS FILMES DISPONÍVEIS
 
     memset(dados, 0, TAM_DADOS);
-    frame = monta_mensagem(0x00, 0x00, 0x0A, dados, 0);
+    frame = monta_mensagem(0x00, sequencia, 0x0A, dados, 0);
+    sequencia = (sequencia + 1) % 32;
 
     // Envia o frame com tipo == LISTA
     if (send(sockfd, &frame, sizeof(frame), 0) < 0)
@@ -85,21 +86,23 @@ int main(int argc, char *argv[])
     {
         if (eh_dados(&frame_resp))
         {
-            if (verifica_crc(&frame_resp))
+            if (frame_resp.sequencia == sequencia)
             {
-                // Mesmo que o server não tenha recebido o ACK da iteração anterior,
-                // e esteja reenviando o nome do vídeo, essa verificação garante que
-                // o mesmo nome não seja considerado mais de uma vez...
-                if (!esta_na_pilha(&pilhaFilmes, (char*)frame_resp.dados))
-                    push(&pilhaFilmes, (char*)frame_resp.dados);
-                
-                if (!send_ack(sockfd))
-                    return EXIT_FAILURE;
-            }
-            else
-            {
-                if (!send_nack(sockfd))
-                    return EXIT_FAILURE;
+                if (verifica_crc(&frame_resp))
+                {
+                    if (!esta_na_pilha(&pilhaFilmes, (char*)frame_resp.dados))
+                        push(&pilhaFilmes, (char*)frame_resp.dados);
+                    
+                    if (!send_ack(sockfd, sequencia))
+                        return EXIT_FAILURE;
+
+                    sequencia = (sequencia + 1) % 32;
+                }
+                else
+                {
+                    if (!send_nack(sockfd, sequencia))
+                        return EXIT_FAILURE;
+                }
             }
         }
 
@@ -112,8 +115,10 @@ int main(int argc, char *argv[])
 
     // Frame indicando final de transmissão recebido do server.
 
-    if (!send_ack(sockfd))
+    if (!send_ack(sockfd, sequencia))
         return EXIT_FAILURE;
+
+    sequencia = (sequencia + 1) % 32;
 
     // LOOP PRINCIPAL DO CLIENT
     while (1) 
@@ -171,7 +176,8 @@ int main(int argc, char *argv[])
 
             // Prepara e envia o frame com o nome do vídeo
             strncpy((char*)dados, pilhaFilmes.items[entradaVideo-1], TAM_DADOS-1);
-            frame = monta_mensagem((unsigned char)strlen(pilhaFilmes.items[entradaVideo-1]), 0x00, 0x0B, dados, 1);
+            frame = monta_mensagem((unsigned char)strlen(pilhaFilmes.items[entradaVideo-1]), sequencia, 0x0B, dados, 1);
+            sequencia = (sequencia + 1) % 32;
 
             if (send(sockfd, &frame, sizeof(frame), 0) < 0)
             {
@@ -190,6 +196,13 @@ int main(int argc, char *argv[])
                 return EXIT_FAILURE;
             }
 
+            arquivoTesteCliente = fopen("ArquivoTesteCliente", "wb");
+            if (!arquivoTesteCliente)
+            {
+                perror("Erro ao abrir/criar o arquivo");
+                return EXIT_FAILURE;
+            }
+
             // Começa a receber os dados referentes ao vídeo pedido
             if (recv(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
             {
@@ -200,6 +213,7 @@ int main(int argc, char *argv[])
             // Se pega um FIM_TX sem querer da placa de rede
             while (eh_fimtx(&frame_resp))
             {
+                printf("\n\nRECEBEU FIM TX DO NADA\n\n");
                 if (recv(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
                 {
                     perror("Erro no recebimento:");
@@ -210,38 +224,40 @@ int main(int argc, char *argv[])
             while (!eh_fimtx(&frame_resp)) // Até receber um frame válido do tipo == "fim_tx"
             {
                 if (eh_dados(&frame_resp))
-                {
+                {   
+                    if (frame_resp.sequencia == sequencia)
+                    {
+                        if (verifica_crc(&frame_resp))
+                        {
+                            print_frame(&frame_resp, arquivoTesteCliente);
+
+                            fwrite(frame_resp.dados, sizeof(unsigned char), frame_resp.tamanho, arq);
+
+                            if (!send_ack(sockfd, sequencia))
+                                return EXIT_FAILURE;
+
+                            sequencia = (sequencia + 1) % 32;
+                        }
+                        else
+                        {
+                            if (!send_nack(sockfd, sequencia))
+                                return EXIT_FAILURE;
+                        }
+                    }
                     // Pode ocorrer de o server não receber o ACK pela mensagem anterior.
                     // Nesse sentido, ele ficaria reenviando até receber um ACK:
-                    if (sequencia == 0)
+                    else if (sequencia == 0)
                     {
                         if (frame_resp.sequencia == 31)
                         {
-                            if (!send_ack(sockfd))
+                            if (!send_ack(sockfd, (unsigned char)31))
                                 return EXIT_FAILURE;
                         }
                     }
                     else if (frame_resp.sequencia == sequencia - 1)
                     {
-                        if (!send_ack(sockfd))
+                        if (!send_ack(sockfd, sequencia - 1))
                             return EXIT_FAILURE;
-                    }
-
-                    if (frame_resp.sequencia == sequencia)
-                    {
-                        if (verifica_crc(&frame_resp))
-                        {
-                            fwrite(frame_resp.dados, sizeof(unsigned char), frame_resp.tamanho, arq);
-                            sequencia = (sequencia + 1) % 32;
-
-                            if (!send_ack(sockfd))
-                                return EXIT_FAILURE;
-                        }
-                        else
-                        {
-                            if (!send_nack(sockfd))
-                                return EXIT_FAILURE;
-                        }
                     }
                 }
 
@@ -255,9 +271,12 @@ int main(int argc, char *argv[])
             // Frame indicando final de transmissão recebido do server.
 
             fclose(arq);
+            fclose(arquivoTesteCliente);
 
-            if (!send_ack(sockfd))
+            if (!send_ack(sockfd, sequencia))
                 return EXIT_FAILURE;
+
+            sequencia = (sequencia + 1) % 32;
 
             printf("\nDownload realizado com sucesso\n");
         }
