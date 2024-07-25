@@ -7,7 +7,7 @@ int main(int argc, char *argv[])
     char videoBuffer[TAM_DADOS], caminhoCompleto[TAM_DADOS + 9];
     char *diretorio = "./videos/";
 
-    FILE *arq, *arquivoTesteServer;
+    FILE *arq, *arquivoTesteServer, *arquivoLocal;
 
     frame_t frame;
     frame_t frame_resp;
@@ -58,10 +58,17 @@ int main(int argc, char *argv[])
                 if (strcmp(entry->d_name, ".") && strcmp(entry->d_name, ".."))
                 {
                     // Prepara e envia o frame com o nome do vídeo
-                    strncpy((char*)dados, entry->d_name, TAM_DADOS-1);
-                    frame_resp = monta_mensagem((unsigned char)strlen(entry->d_name), sequencia, 0x12, dados, 1);
+                    strncpy((char*)frame_resp.dados, entry->d_name, TAM_DADOS-1);
+
+                    frame_resp.marcadorInicio = 0x7E;
+                    frame_resp.tamanho = (unsigned char)strlen(entry->d_name);
+                    frame_resp.sequencia = sequencia;
+                    frame_resp.tipo = 0x12;
+                    frame_resp.crc8 = calcula_crc(&frame_resp);
 
                     sequencia = (sequencia + 1) % 32;
+
+                    printf("%s\n", frame_resp.dados);
 
                     if (send(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
                     {
@@ -105,6 +112,8 @@ int main(int argc, char *argv[])
                 strncpy(videoBuffer, (char*)frame.dados, TAM_DADOS-1);
                 snprintf(caminhoCompleto, TAM_DADOS + 9, "%s%s", diretorio, videoBuffer);
 
+                printf("%s\n", caminhoCompleto);
+
                 arq = fopen(caminhoCompleto, "rb");
                 if (!arq)
                 {
@@ -119,8 +128,17 @@ int main(int argc, char *argv[])
                     return EXIT_FAILURE;
                 }
 
+                arquivoLocal = fopen("ArquivoLocal", "wb");
+                if (!arquivoLocal)
+                {
+                    perror("Erro ao abrir/criar o arquivo");
+                    return EXIT_FAILURE;
+                }
+
                 while ((bytesEscritos = fread(dados, sizeof(unsigned char), TAM_DADOS-1, arq)) > 0)
                 {
+                    fwrite(dados, sizeof(unsigned char), (unsigned char)bytesEscritos, arquivoLocal);
+
                     // Prepara e envia o frame com os dados do vídeo
                     frame_resp = monta_mensagem((unsigned char)bytesEscritos, sequencia, 0x12, dados, 1);
                     sequencia = (sequencia + 1) % 32;
@@ -139,6 +157,7 @@ int main(int argc, char *argv[])
 
                 fclose(arq);
                 fclose(arquivoTesteServer);
+                fclose(arquivoLocal);
 
                 // Prepara FIM_TX
                 memset(dados, 0, TAM_DADOS);

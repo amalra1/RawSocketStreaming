@@ -175,8 +175,14 @@ int main(int argc, char *argv[])
             printf("\nIniciando Download\n");
 
             // Prepara e envia o frame com o nome do vídeo
-            strncpy((char*)dados, pilhaFilmes.items[entradaVideo-1], TAM_DADOS-1);
-            frame = monta_mensagem((unsigned char)strlen(pilhaFilmes.items[entradaVideo-1]), sequencia, 0x0B, dados, 1);
+            strncpy((char*)frame.dados, pilhaFilmes.items[entradaVideo-1], TAM_DADOS-1);
+
+            frame.marcadorInicio = 0x7E;
+            frame.tamanho = (unsigned char)strlen(pilhaFilmes.items[entradaVideo-1]);
+            frame.sequencia = sequencia;
+            frame.tipo = 0x0B;
+            frame.crc8 = calcula_crc(&frame);
+
             sequencia = (sequencia + 1) % 32;
 
             if (send(sockfd, &frame, sizeof(frame), 0) < 0)

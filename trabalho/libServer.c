@@ -55,9 +55,8 @@ frame_t monta_mensagem(unsigned char tam, unsigned char sequencia, unsigned char
     frame.sequencia = sequencia;
     frame.tipo = tipo;
 
-    memset(frame.dados, 0, TAM_DADOS);
     if (dados != NULL)
-        strncpy((char*)frame.dados, (char*)dados, TAM_DADOS - 1);
+        memcpy(frame.dados, dados, tam);
 
     // caso seja necessário, calcula o crc
     if (crc_flag){
