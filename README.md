@@ -31,16 +31,18 @@ Um servidor normalmente executa os seguintes passos para oferecer serviço aos c
 2. ~~Criar estrutura do `frame` que será enviado.~~
 3. ~~Enviar `frame` do `client` para o `server`.~~
 4. ~~Enviar resposta do `server` para o `client`. (ACK por exemplo).~~
-5. Implementar CRC-8 no `client` e no `server`.
-6. Implementar lógica do envio do NACK se o CRC-8 falhar.
-7. Fazer lógica do para-e-espera para envio da lista de filmes. (1 nome de filme por frame)
-8. Implementar o item `dados`, mandando o tipo dele e no campo dados o nome do filme, retornando uma descrição do filme (Não sei se é isso).
-9. Entender o que é o `mostra na tela`.
-10. Entender o que é o `descritor arquivo`.
-11. Implementar a janela deslizante para fazer o tipo `baixar`.
-12. Fazer a transferência de arquivo do tipo `baixar`.
-13. Implementar a lógica do `timeout`.
-14. Implementar e testar os erros possíveis.
+5. ~~Implementar CRC-8 no `client` e no `server`.~~
+6. ~~Implementar lógica do envio do NACK se o CRC-8 falhar.~~
+7. ~~Fazer lógica do para-e-espera para envio da lista de filmes. (1 nome de filme por frame)~~
+8. ~~Implementar o item `dados`, mandando o tipo dele e no campo dados o nome do filme, retornando uma descrição do filme (Não sei se é isso).~~ (não era)  
+9. ~~Entender o que é o `mostra na tela`.~~
+10. ~~Entender o que é o `descritor arquivo`.~~
+11. ~~Fazer a transferência de arquivo do tipo `baixar`.~~
+12. ~~Implementar a lógica do `timeout`.~~
+13. [NOVO] Fazer o server enviar o `descritor arquivo`.
+14. Implementar a janela deslizante.
+15. Implementar e testar os erros possíveis.  
+16. Testar em dois computadores.
 
 ## Atualizações e erros
 
