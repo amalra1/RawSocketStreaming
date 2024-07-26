@@ -5,7 +5,6 @@ int main(int argc, char *argv[])
     int sockfd, bytesEscritos;
     unsigned char dados[TAM_DADOS], sequencia = 0;
     char videoBuffer[TAM_DADOS], caminhoCompleto[TAM_DADOS + 9];
-    char *diretorio = "./videos/";
 
     FILE *arq, *arquivoTesteServer, *arquivoLocal;
 
@@ -46,7 +45,7 @@ int main(int argc, char *argv[])
             // Vasculha na pasta dos vídeos pelos nomes
             struct dirent *entry;
 
-            DIR *dir = opendir(diretorio);
+            DIR *dir = opendir(CAMINHO_VIDEOS);
             if (dir == NULL)
             {
                 perror("opendir");
@@ -60,6 +59,7 @@ int main(int argc, char *argv[])
                     // Prepara e envia o frame com o nome do vídeo
                     strncpy((char*)frame_resp.dados, entry->d_name, TAM_DADOS-1);
 
+                    // Monta sem usar a função pra não dar problema com string
                     frame_resp.marcadorInicio = 0x7E;
                     frame_resp.tamanho = (unsigned char)strlen(entry->d_name);
                     frame_resp.sequencia = sequencia;
@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
                 sequencia = (sequencia + 1) % 32;
 
                 strncpy(videoBuffer, (char*)frame.dados, TAM_DADOS-1);
-                snprintf(caminhoCompleto, TAM_DADOS + 9, "%s%s", diretorio, videoBuffer);
+                snprintf(caminhoCompleto, TAM_DADOS + 9, "%s%s", CAMINHO_VIDEOS, videoBuffer);
 
                 printf("%s\n", caminhoCompleto);
 
@@ -135,7 +135,26 @@ int main(int argc, char *argv[])
                     return EXIT_FAILURE;
                 }
 
-                while ((bytesEscritos = fread(dados, sizeof(unsigned char), TAM_DADOS-1, arq)) > 0)
+                // Envia 'descritor_arquivo' 
+
+                // Pega tamanho do vídeo
+                struct stat st;
+                stat(caminhoCompleto, &st);
+                int64_t tamVideo = st.st_size;
+
+                // Pega data da última modificação
+                char versaoVideo[32];
+                strftime(versaoVideo, sizeof(versaoVideo), "%Y-%m-%d %H:%M:%S", localtime(&st.st_mtime));
+
+                // Junta os dois em uma String separando por " | " e envia a msg (?)
+
+                // printf("%s\n", videoBuffer);
+                // printf("Tamanho do video: %ld bytes\n", tamVideo);
+                // printf("Versão: %s\n", versaoVideo);
+
+                // O reto da lógica é pra estar no client
+
+                while((bytesEscritos = fread(dados, sizeof(unsigned char), TAM_DADOS-1, arq)) > 0)
                 {
                     fwrite(dados, sizeof(unsigned char), (unsigned char)bytesEscritos, arquivoLocal);
 
@@ -181,14 +200,6 @@ int main(int argc, char *argv[])
             }
         }
 
-        // recebeu um "MOSTRA NA TELA"
-        else if (frame.tipo == 0x10){} 
-        // recebeu um "DESCRITOR ARQUIVO" -- server recebe? resp: sei nem oq faz man kkkkkkkk
-        else if (frame.tipo == 0x11){} 
-        // recebeu um "DADOS" -- server recebe?
-        else if (frame.tipo == 0x12){} 
-        // recebeu um "FIM TX" -- server recebe?
-        else if (frame.tipo == 0x1E){} 
         // recebeu um "ERRO"
         else if (frame.tipo == 0x1F){}
 
