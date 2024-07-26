@@ -11,15 +11,15 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 #include <dirent.h>
+#include <sys/stat.h>
+#include <time.h>
 
 #ifndef _libServer_
 #define _libServer_
 
 #define TAM_DADOS 64 // 1byte = 8bits, 64bytes = 512bits
-#define TAM_JANELA_PEE 1  // Tamanho da janela do Para-E-Espera
-#define TAM_JANELA_JD 5  // Tamanho da janela da Janela Deslizante
-#define MAX_TENTATIVAS 8  // Número máximo de tentativas após falha do CRC-8
-#define TIMEOUT_SEC 60
+#define TAM_JANELA 5  // Tamanho da janela da Janela Deslizante
+#define CAMINHO_VIDEOS "./videos/"
 
 typedef struct
 {
