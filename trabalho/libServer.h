@@ -22,6 +22,10 @@
 #define TAM_JANELA 5  // Tamanho da janela da Janela Deslizante
 #define CAMINHO_VIDEOS "./videos/"
 
+#define ERRO_ACESSO_NEGADO 1
+#define ERRO_NAO_ENCONTRADO 2
+#define ERRO_DISCO_CHEIO 3
+
 typedef struct
 {
     unsigned char marcadorInicio: 8;
@@ -55,6 +59,7 @@ int send_ack(int sockfd, unsigned char sequencia);
 int send_nack(int sockfd, unsigned char sequencia);
 
 // Espera pelo ACK (com timeout) e trata eventuais NACK
+// Retorna 1 quando recebe o ACK, e 0 se deu problema e 2 se recebeu um ERRO
 int wait_ack(int sockfd, frame_t *frame_envio, int tempo_timeout);
 
 // Calcula o CRC-8 da mensagem e o retorna
@@ -80,6 +85,9 @@ int eh_desc_arq(frame_t *frame);
 
 // Analisa se a mensagem é válida e se é um DADOS
 int eh_dados(frame_t *frame);
+
+// Analisa se a mensagem é válida e se é um ERRO
+int eh_erro(frame_t *frame);
 
 // Analisa se a mensagem é válida e se é um FIM_TX
 int eh_fimtx(frame_t *frame);

@@ -6,11 +6,21 @@ void int64_to_bytes(int64_t value, unsigned char* bytes)
         bytes[i] = (unsigned char)((value >> (i * 8)) & 0xFF);
 }
 
+int bytes_para_int(unsigned char* bytes, int tam) 
+{
+    int valor = 0;
+    for (int i = 0; i < tam; i++)
+        valor |= (int)bytes[i] << (i * 8);
+
+    return valor;
+}
+
 int main(int argc, char *argv[]) 
 {
     int sockfd, bytesEscritos;
     unsigned char dados[TAM_DADOS], sequencia = 0;
     char videoBuffer[TAM_DADOS], caminhoCompleto[TAM_DADOS + 9];
+    int retornoWaitACK = 0;
 
     FILE *arq, *arquivoTesteServer, *arquivoLocal;
 
@@ -82,7 +92,7 @@ int main(int argc, char *argv[])
                         return EXIT_FAILURE;
                     }
 
-                    if (!wait_ack(sockfd, &frame_resp, 1000))
+                    if (wait_ack(sockfd, &frame_resp, 1000) == 0)
                         return EXIT_FAILURE;
                 }
             }
@@ -101,7 +111,7 @@ int main(int argc, char *argv[])
                 return EXIT_FAILURE;
             }
 
-            if (!wait_ack(sockfd, &frame_resp, 1000))
+            if (wait_ack(sockfd, &frame_resp, 1000) == 0)
                 return EXIT_FAILURE;
         }
         
@@ -110,6 +120,7 @@ int main(int argc, char *argv[])
         {
             if (verifica_crc(&frame))
             {
+                // Manda ACK
                 if (!send_ack(sockfd, sequencia))
                     return EXIT_FAILURE;
 
@@ -164,7 +175,7 @@ int main(int argc, char *argv[])
                 }
 
                 // Espera pelo ACK
-                if (!wait_ack(sockfd, &frame_resp, 1000))
+                if (wait_ack(sockfd, &frame_resp, 1000) == 0)
                     return EXIT_FAILURE;
 
                 // Pega data da última modificação
@@ -192,7 +203,7 @@ int main(int argc, char *argv[])
                 }
 
                 // Espera pelo ACK
-                if (!wait_ack(sockfd, &frame_resp, 1000))
+                if (wait_ack(sockfd, &frame_resp, 1000) == 0)
                     return EXIT_FAILURE;
 
                 while((bytesEscritos = fread(dados, sizeof(unsigned char), TAM_DADOS-1, arq)) > 0)
@@ -211,28 +222,55 @@ int main(int argc, char *argv[])
                         return EXIT_FAILURE;
                     }
 
-                    if (!wait_ack(sockfd, &frame_resp, 1000))
+                    retornoWaitACK = wait_ack(sockfd, &frame_resp, 1000);
+
+                    if (retornoWaitACK == 0)
                         return EXIT_FAILURE;
+                    else if (retornoWaitACK == 2)
+                        break;
                 }
 
                 fclose(arq);
                 fclose(arquivoTesteServer);
                 fclose(arquivoLocal);
 
-                // Prepara FIM_TX
-                memset(dados, 0, TAM_DADOS);
-                frame_resp = monta_mensagem(0x00, sequencia, 0x1E, dados, 0);
-                sequencia = (sequencia + 1) % 32;
-
-                // Envia FIM_TX
-                if (send(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
+                if (retornoWaitACK == 2)
                 {
-                    perror("Erro no envio:");
-                    return EXIT_FAILURE;
-                }
+                    while (!eh_erro(&frame))
+                    {
+                        if (recv(sockfd, &frame, sizeof(frame), 0) < 0)
+                        {
+                            perror("Erro no recebimento:");
+                            return 0;
+                        }
+                    }
 
-                if (!wait_ack(sockfd, &frame_resp, 1000))
-                    return EXIT_FAILURE;
+                    // Manda ACK
+                    if (!send_ack(sockfd, sequencia))
+                        return EXIT_FAILURE;
+                    sequencia = (sequencia + 1) % 32;
+
+                    printf("ERRO %d DETECTADO NO CLIENT\n", bytes_para_int(frame.dados, frame.tamanho));
+
+                    retornoWaitACK = 0;
+                }
+                else
+                {
+                    // Prepara FIM_TX
+                    memset(dados, 0, TAM_DADOS);
+                    frame_resp = monta_mensagem(0x00, sequencia, 0x1E, dados, 0);
+                    sequencia = (sequencia + 1) % 32;
+
+                    // Envia FIM_TX
+                    if (send(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
+                    {
+                        perror("Erro no envio:");
+                        return EXIT_FAILURE;
+                    }
+
+                    if (wait_ack(sockfd, &frame_resp, 1000) == 0)
+                        return EXIT_FAILURE;
+                }
             }
             else
             {
@@ -240,9 +278,6 @@ int main(int argc, char *argv[])
                     return EXIT_FAILURE;
             }
         }
-
-        // recebeu um "ERRO"
-        else if (frame.tipo == 0x1F){}
 
         if (recv(sockfd, &frame, sizeof(frame), 0) < 0)
         {

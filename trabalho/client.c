@@ -41,6 +41,12 @@ int bytes_para_int(unsigned char* bytes, int tam)
     return valor;
 }
 
+void int_para_unsigned_char(int valor, unsigned char* bytes, int tam) 
+{
+    for (int i = 0; i < tam; i++)
+        bytes[i] = (valor >> (i * 8)) & 0xFF;
+}
+
 unsigned long long pega_espaco_disco(const char* caminho) 
 {
     struct statvfs stat;
@@ -58,9 +64,10 @@ unsigned long long pega_espaco_disco(const char* caminho)
 
 int main(int argc, char *argv[]) 
 {
+    int DeuErro = 0;
     int sockfd, entradaOpcao, entradaVideo;
-    unsigned char dados[TAM_DADOS], sequencia = 0;
     int tamVideo, tamRecebido, versaoVideoRecebida;
+    unsigned char dados[TAM_DADOS], sequencia = 0;
     char versaoVideo[32];
     unsigned long long espacoDispDisco = pega_espaco_disco("/");
 
@@ -99,7 +106,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    if (!wait_ack(sockfd, &frame, 1000))
+    if (wait_ack(sockfd, &frame, 1000) == 0)
         return EXIT_FAILURE;
 
     // Começa a receber os dados referentes ao comando "lista"
@@ -217,7 +224,7 @@ int main(int argc, char *argv[])
                 return EXIT_FAILURE;
             }
 
-            if (!wait_ack(sockfd, &frame, 1000))
+            if (wait_ack(sockfd, &frame, 1000) == 0)
                 return EXIT_FAILURE;
 
             // Cria o arquivo que será o vídeo
@@ -253,6 +260,11 @@ int main(int argc, char *argv[])
                     {
                         if (verifica_crc(&frame_resp))
                         {
+                            // Manda ACK
+                            if (!send_ack(sockfd, sequencia))
+                                return EXIT_FAILURE;
+                            sequencia = (sequencia + 1) % 32;
+
                             print_frame(&frame_resp, arquivoTesteCliente);
 
                             if (!versaoVideoRecebida && tamRecebido)
@@ -265,11 +277,33 @@ int main(int argc, char *argv[])
                                     printf("Iniciando download de %s...\nTamanho: %d bytes\nÚltima data de modificação: %s\n", pilhaFilmes.items[entradaVideo-1], tamVideo, versaoVideo);
                                 else
                                 {
+                                    DeuErro = 1;
+                                    sequencia = (sequencia + 1) % 32;
+
                                     printf("ERRO: Impossível fazer o Download porque o vídeo não cabe no disco, libere espaço e tente baixar novamente:\n");
                                     printf("Tamanho do vídeo: %d bytes\n", tamVideo);
                                     printf("Espaço disponível em disco: %llu\n", espacoDispDisco);
-                                    printf("Fechando programa...\n");
-                                    return EXIT_FAILURE;
+                                    printf("Voltando a tela inicial...\n\n");
+
+                                    unsigned char bytes[4];
+                                    int_para_unsigned_char(ERRO_DISCO_CHEIO, bytes, sizeof(int));
+
+                                    // Prepara frame de ERRO
+                                    frame = monta_mensagem(sizeof(bytes), sequencia, 0x1F, bytes, 1);
+                                    sequencia = (sequencia + 1) % 32;
+
+                                    // Envia frame de ERRO
+                                    if (send(sockfd, &frame, sizeof(frame), 0) < 0)
+                                    {
+                                        perror("Erro no envio:");
+                                        return EXIT_FAILURE;
+                                    }
+
+                                    // Espera pelo ACK
+                                    if (wait_ack(sockfd, &frame, 1000) == 0)
+                                            return EXIT_FAILURE;
+
+                                    break;
                                 }
                             }
 
@@ -278,12 +312,6 @@ int main(int argc, char *argv[])
                                 tamVideo = bytes_para_int(frame_resp.dados, frame_resp.tamanho);
                                 tamRecebido = 1;
                             }
-                            
-                            // Manda ACK
-                            if (!send_ack(sockfd, sequencia))
-                                return EXIT_FAILURE;
-
-                            sequencia = (sequencia + 1) % 32;
                         }
                         else
                         {
@@ -348,12 +376,17 @@ int main(int argc, char *argv[])
             fclose(arq);
             fclose(arquivoTesteCliente);
 
-            if (!send_ack(sockfd, sequencia))
-                return EXIT_FAILURE;
+            if (!DeuErro)
+            {
+                if (!send_ack(sockfd, sequencia))
+                    return EXIT_FAILURE;
 
-            sequencia = (sequencia + 1) % 32;
+                sequencia = (sequencia + 1) % 32;
 
-            printf("\nDownload realizado com sucesso\n");
+                printf("\nDownload realizado com sucesso\n");
+            }
+
+            DeuErro = 0;
         }
 
         if (entradaOpcao == 2)

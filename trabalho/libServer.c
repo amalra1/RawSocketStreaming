@@ -161,6 +161,10 @@ int wait_ack(int sockfd, frame_t *frame_envio, int tempo_timeout)
         perror("Erro no recebimento:");
         return 0;
     }
+
+    if (eh_erro(&frame_recebimento))
+        return 2;
+
     while (!(eh_ack(&frame_recebimento) && frame_recebimento.sequencia == frame_envio->sequencia) && (marcador_tempo = timestamp() - tempo_inicial) < tempo_timeout)
     {
         if (eh_nack(&frame_recebimento) && frame_recebimento.sequencia == frame_envio->sequencia)
@@ -207,6 +211,9 @@ int wait_ack(int sockfd, frame_t *frame_envio, int tempo_timeout)
             perror("Erro no recebimento:");
             return 0;
         }
+
+        if (eh_erro(&frame_recebimento))
+            return 2;
     }
 
     // Caso tenha atingido o timeout, reenvia a msg e recursivamente espera pelo ACK
@@ -293,6 +300,13 @@ int eh_desc_arq(frame_t *frame)
 int eh_dados(frame_t *frame)
 {
     if (frame->marcadorInicio != 0x7E || frame->tipo != 0x12)
+        return 0;
+    return 1;
+}
+
+int eh_erro(frame_t *frame)
+{
+    if (frame->marcadorInicio != 0x7E || frame->tipo != 0x1F)
         return 0;
     return 1;
 }
