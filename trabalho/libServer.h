@@ -13,6 +13,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <sys/statvfs.h>
 
 #ifndef _libServer_
 #define _libServer_
@@ -73,6 +74,9 @@ int eh_lista(frame_t *frame);
 
 // Analisa se a mensagem é válida e se é um BAIXAR
 int eh_baixar(frame_t *frame);
+
+// Analisa se a mensagem é válida e se é um DESCRITOR ARQUIVO
+int eh_desc_arq(frame_t *frame);
 
 // Analisa se a mensagem é válida e se é um DADOS
 int eh_dados(frame_t *frame);

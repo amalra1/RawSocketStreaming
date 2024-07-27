@@ -283,6 +283,13 @@ int eh_baixar(frame_t *frame)
     return 1;
 }
 
+int eh_desc_arq(frame_t *frame)
+{
+    if (frame->marcadorInicio != 0x7E || frame->tipo != 0x11)
+        return 0;
+    return 1;
+}
+
 int eh_dados(frame_t *frame)
 {
     if (frame->marcadorInicio != 0x7E || frame->tipo != 0x12)

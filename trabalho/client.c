@@ -31,10 +31,38 @@ void limpa_tela()
     print_cabecalho_client();
 }
 
+
+int bytes_para_int(unsigned char* bytes, int tam) 
+{
+    int valor = 0;
+    for (int i = 0; i < tam; i++)
+        valor |= (int)bytes[i] << (i * 8);
+
+    return valor;
+}
+
+unsigned long long pega_espaco_disco(const char* caminho) 
+{
+    struct statvfs stat;
+
+    if (statvfs(caminho, &stat) != 0)
+    {
+        perror("statvfs deu errado");
+        exit(EXIT_FAILURE);
+    }
+
+    // Calcula espaço em bytes
+    unsigned long long espaco_disponivel = stat.f_bavail * stat.f_frsize;
+    return espaco_disponivel;
+}
+
 int main(int argc, char *argv[]) 
 {
     int sockfd, entradaOpcao, entradaVideo;
     unsigned char dados[TAM_DADOS], sequencia = 0;
+    int tamVideo, tamRecebido, versaoVideoRecebida;
+    char versaoVideo[32];
+    unsigned long long espacoDispDisco = pega_espaco_disco("/");
 
     FILE *arq, *arquivoTesteCliente;
 
@@ -172,8 +200,6 @@ int main(int argc, char *argv[])
                 scanf("%d", &entradaVideo);
             }
 
-            printf("\nIniciando Download\n");
-
             // Prepara e envia o frame com o nome do vídeo
             strncpy((char*)frame.dados, pilhaFilmes.items[entradaVideo-1], TAM_DADOS-1);
 
@@ -216,20 +242,59 @@ int main(int argc, char *argv[])
                 return EXIT_FAILURE;
             }
 
-            // Se pega um FIM_TX sem querer da placa de rede
-            while (eh_fimtx(&frame_resp))
-            {
-                printf("\n\nRECEBEU FIM TX DO NADA\n\n");
-                if (recv(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
-                {
-                    perror("Erro no recebimento:");
-                    return EXIT_FAILURE;
-                }
-            }
+            tamRecebido = 0;
+            versaoVideoRecebida = 0;
 
-            while (!eh_fimtx(&frame_resp)) // Até receber um frame válido do tipo == "fim_tx"
+            while (!eh_fimtx(&frame_resp))
             {
-                if (eh_dados(&frame_resp))
+                if (eh_desc_arq(&frame_resp))
+                {
+                    if (frame_resp.sequencia == sequencia)
+                    {
+                        if (verifica_crc(&frame_resp))
+                        {
+                            print_frame(&frame_resp, arquivoTesteCliente);
+
+                            if (!versaoVideoRecebida && tamRecebido)
+                            {
+                                strcpy(versaoVideo, (char*)frame_resp.dados);
+                                versaoVideoRecebida = 1;
+
+                                // Verifica se o video cabe na maquina do client
+                                if (tamVideo < espacoDispDisco)
+                                    printf("Iniciando download de %s...\nTamanho: %d bytes\nÚltima data de modificação: %s\n", pilhaFilmes.items[entradaVideo-1], tamVideo, versaoVideo);
+                                else
+                                {
+                                    printf("ERRO: Impossível fazer o Download porque o vídeo não cabe no disco, libere espaço e tente baixar novamente:\n");
+                                    printf("Tamanho do vídeo: %d bytes\n", tamVideo);
+                                    printf("Espaço disponível em disco: %llu\n", espacoDispDisco);
+                                    printf("Fechando programa...\n");
+                                    return EXIT_FAILURE;
+                                }
+                            }
+
+                            if (!tamRecebido)
+                            {
+                                tamVideo = bytes_para_int(frame_resp.dados, frame_resp.tamanho);
+                                tamRecebido = 1;
+                            }
+                            
+                            // Manda ACK
+                            if (!send_ack(sockfd, sequencia))
+                                return EXIT_FAILURE;
+
+                            sequencia = (sequencia + 1) % 32;
+                        }
+                        else
+                        {
+                            // Manda NACK
+                            if (!send_nack(sockfd, sequencia))
+                                return EXIT_FAILURE;
+                        }
+                    }
+                }
+
+                else if (eh_dados(&frame_resp))
                 {   
                     if (frame_resp.sequencia == sequencia)
                     {
@@ -239,6 +304,7 @@ int main(int argc, char *argv[])
 
                             fwrite(frame_resp.dados, sizeof(unsigned char), frame_resp.tamanho, arq);
 
+                            // Manda ACK
                             if (!send_ack(sockfd, sequencia))
                                 return EXIT_FAILURE;
 
@@ -246,6 +312,7 @@ int main(int argc, char *argv[])
                         }
                         else
                         {
+                            // Manda NACK
                             if (!send_nack(sockfd, sequencia))
                                 return EXIT_FAILURE;
                         }
@@ -256,12 +323,14 @@ int main(int argc, char *argv[])
                     {
                         if (frame_resp.sequencia == 31)
                         {
+                            // Manda ACK
                             if (!send_ack(sockfd, (unsigned char)31))
                                 return EXIT_FAILURE;
                         }
                     }
                     else if (frame_resp.sequencia == sequencia - 1)
                     {
+                        // Manda ACK
                         if (!send_ack(sockfd, sequencia - 1))
                             return EXIT_FAILURE;
                     }
@@ -293,7 +362,6 @@ int main(int argc, char *argv[])
 
     // Encerra o socket
     close(sockfd);
-
     fprintf(stdout, "\nConexão fechada\n\n");
 
     return EXIT_SUCCESS;

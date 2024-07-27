@@ -1,5 +1,11 @@
 #include "libServer.h"
 
+void int64_to_bytes(int64_t value, unsigned char* bytes) 
+{
+    for (int i = 0; i < 8; i++)
+        bytes[i] = (unsigned char)((value >> (i * 8)) & 0xFF);
+}
+
 int main(int argc, char *argv[]) 
 {
     int sockfd, bytesEscritos;
@@ -142,17 +148,52 @@ int main(int argc, char *argv[])
                 stat(caminhoCompleto, &st);
                 int64_t tamVideo = st.st_size;
 
+                // Prepara frame com tamanho do video
+                unsigned char bytes[8];
+                int64_to_bytes(tamVideo, bytes);
+
+                frame_resp = monta_mensagem(sizeof(bytes), sequencia, 0x11, bytes, 1);
+                sequencia = (sequencia + 1) % 32;
+                print_frame(&frame_resp, arquivoTesteServer);
+
+                // Envia frame com tamanho do video
+                if (send(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
+                {
+                    perror("Erro no envio:");
+                    return EXIT_FAILURE;
+                }
+
+                // Espera pelo ACK
+                if (!wait_ack(sockfd, &frame_resp, 1000))
+                    return EXIT_FAILURE;
+
                 // Pega data da última modificação
                 char versaoVideo[32];
                 strftime(versaoVideo, sizeof(versaoVideo), "%Y-%m-%d %H:%M:%S", localtime(&st.st_mtime));
 
-                // Junta os dois em uma String separando por " | " e envia a msg (?)
+                // Prepara frame com data da ultima modificação
+                strncpy((char*)frame_resp.dados, versaoVideo, TAM_DADOS-1);
 
-                // printf("%s\n", videoBuffer);
-                // printf("Tamanho do video: %ld bytes\n", tamVideo);
-                // printf("Versão: %s\n", versaoVideo);
+                // Monta sem usar a função pra não dar problema com string
+                frame_resp.marcadorInicio = 0x7E;
+                frame_resp.tamanho = (unsigned char)strlen(versaoVideo);
+                frame_resp.sequencia = sequencia;
+                frame_resp.tipo = 0x11;
+                frame_resp.crc8 = calcula_crc(&frame_resp);
 
-                // O reto da lógica é pra estar no client
+                sequencia = (sequencia + 1) % 32;
+                print_frame(&frame_resp, arquivoTesteServer);
+
+                // Envia frame com tamanho do video
+                if (send(sockfd, &frame_resp, sizeof(frame_resp), 0) < 0)
+                {
+                    perror("Erro no envio:");
+                    return EXIT_FAILURE;
+                }
+
+                // Espera pelo ACK
+                if (!wait_ack(sockfd, &frame_resp, 1000))
+                    return EXIT_FAILURE;
 
                 while((bytesEscritos = fread(dados, sizeof(unsigned char), TAM_DADOS-1, arq)) > 0)
                 {
