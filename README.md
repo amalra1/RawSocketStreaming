@@ -39,10 +39,10 @@ Um servidor normalmente executa os seguintes passos para oferecer serviço aos c
 10. ~~Entender o que é o `descritor arquivo`.~~
 11. ~~Fazer a transferência de arquivo do tipo `baixar`.~~
 12. ~~Implementar a lógica do `timeout`.~~
-13. [NOVO] Fazer o server enviar o `descritor arquivo`.
-14. Implementar a janela deslizante.
-15. Implementar e testar os erros possíveis.  
-16. Testar em dois computadores.
+13. ~~[NOVO] Fazer o server enviar o `descritor arquivo`.~~
+15. ~~Implementar e testar os erros possíveis.~~
+16. Implementar a janela deslizante.  
+17. Testar em dois computadores.
 
 ## Atualizações e erros
 
