@@ -31,22 +31,6 @@ void limpa_tela()
     print_cabecalho_client();
 }
 
-
-int bytes_para_int(unsigned char* bytes, int tam) 
-{
-    int valor = 0;
-    for (int i = 0; i < tam; i++)
-        valor |= (int)bytes[i] << (i * 8);
-
-    return valor;
-}
-
-void int_para_unsigned_char(int valor, unsigned char* bytes, int tam) 
-{
-    for (int i = 0; i < tam; i++)
-        bytes[i] = (valor >> (i * 8)) & 0xFF;
-}
-
 unsigned long long pega_espaco_disco(const char* caminho) 
 {
     struct statvfs stat;
@@ -64,12 +48,12 @@ unsigned long long pega_espaco_disco(const char* caminho)
 
 int main(int argc, char *argv[]) 
 {
-    int DeuErro = 0;
+    int erroDisco = 0, outroErro = 0;
     int sockfd, entradaOpcao, entradaVideo;
     int tamVideo, tamRecebido, versaoVideoRecebida;
     unsigned char dados[TAM_DADOS], sequencia = 0;
     char versaoVideo[32];
-    unsigned long long espacoDispDisco = pega_espaco_disco("/");
+    unsigned long long espacoDispDisco = pega_espaco_disco(CAMINHO_DIR_RAIZ);
 
     FILE *arq, *arquivoTesteCliente;
 
@@ -254,7 +238,24 @@ int main(int argc, char *argv[])
 
             while (!eh_fimtx(&frame_resp))
             {
-                if (eh_desc_arq(&frame_resp))
+                if (eh_erro(&frame_resp))
+                {
+                    outroErro = 1;
+
+                    // Manda ACK
+                    if (!send_ack(sockfd, sequencia))
+                        return EXIT_FAILURE;
+                    sequencia = (sequencia + 1) % 32;
+
+                    if (bytes_para_int(frame_resp.dados, frame_resp.tamanho) == ERRO_ACESSO_NEGADO)
+                        printf("ERRO: Permissões insuficientes para baixar o vídeo.\nVoltando à tela inicial...\n\n");
+                    else if (bytes_para_int(frame_resp.dados, frame_resp.tamanho) == ERRO_NAO_ENCONTRADO)
+                        printf("ERRO: Vídeo não encontrado na base.\nVoltando à tela inicial...\n\n");
+                    
+                    break;
+                }
+
+                else if (eh_desc_arq(&frame_resp))
                 {
                     if (frame_resp.sequencia == sequencia)
                     {
@@ -277,7 +278,7 @@ int main(int argc, char *argv[])
                                     printf("Iniciando download de %s...\nTamanho: %d bytes\nÚltima data de modificação: %s\n", pilhaFilmes.items[entradaVideo-1], tamVideo, versaoVideo);
                                 else
                                 {
-                                    DeuErro = 1;
+                                    erroDisco = 1;
                                     sequencia = (sequencia + 1) % 32;
 
                                     printf("ERRO: Impossível fazer o Download porque o vídeo não cabe no disco, libere espaço e tente baixar novamente:\n");
@@ -376,7 +377,7 @@ int main(int argc, char *argv[])
             fclose(arq);
             fclose(arquivoTesteCliente);
 
-            if (!DeuErro)
+            if (!erroDisco && !outroErro)
             {
                 if (!send_ack(sockfd, sequencia))
                     return EXIT_FAILURE;
@@ -386,7 +387,8 @@ int main(int argc, char *argv[])
                 printf("\nDownload realizado com sucesso\n");
             }
 
-            DeuErro = 0;
+            erroDisco = 0;
+            outroErro = 0;
         }
 
         if (entradaOpcao == 2)

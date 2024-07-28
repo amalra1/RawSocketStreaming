@@ -21,6 +21,7 @@
 #define TAM_DADOS 64 // 1byte = 8bits, 64bytes = 512bits
 #define TAM_JANELA 5  // Tamanho da janela da Janela Deslizante
 #define CAMINHO_VIDEOS "./videos/"
+#define CAMINHO_DIR_RAIZ "/"
 
 #define ERRO_ACESSO_NEGADO 1
 #define ERRO_NAO_ENCONTRADO 2
@@ -91,5 +92,12 @@ int eh_erro(frame_t *frame);
 
 // Analisa se a mensagem é válida e se é um FIM_TX
 int eh_fimtx(frame_t *frame);
+
+// ----------Funções de mudança de tipo
+void int64_para_bytes(int64_t valor, unsigned char* bytes);
+int bytes_para_int(unsigned char* bytes, int tam);
+void int_para_unsigned_char(int valor, unsigned char* bytes, int tam);
+
+
 
 #endif
